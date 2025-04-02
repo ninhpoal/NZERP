@@ -70,7 +70,28 @@ const MenuStructurePage = () => {
 
             ]
         },
-          
+        {
+            groupId: 5,
+            groupName: "Báo cáo thống kê",
+            icon: Wallet,
+            permissions: {
+                PhanQuyen: ["Admin"],
+                Phong: ["Hành chánh", "Giám đốc"],
+            },
+            items: [
+              
+                {
+                    text: 'Báo cáo dự án ',
+                    icon: ChartPie,
+                    path: '/Duantc',
+                    description: 'Báo cáo dự án',
+                    permissions: {
+                        PhanQuyen: ["Admin"],
+                        Phong: ["Giám đốc"],
+                    }
+                }
+            ]
+        },
         {
             groupId: 3,
             groupName: "Quản Lý Dự án",
@@ -123,20 +144,12 @@ const MenuStructurePage = () => {
                         Phong: ["Hành chánh", "Giám đốc"],
                     }
                 },
-                {
-                    text: 'Báo cáo',
-                    icon: ChartPie,
-                    path: '/Duantc',
-                    description: 'Báo cáo dự án',
-                    permissions: {
-                        PhanQuyen: ["Admin"],
-                        Phong: ["Giám đốc"],
-                    }
-                }
+                
             ]
         },
+      
         {
-            groupId: 5,
+            groupId: 7,
             groupName: "Cài Đặt",
             icon: Settings,
             permissions: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },

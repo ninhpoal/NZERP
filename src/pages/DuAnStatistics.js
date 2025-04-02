@@ -4,6 +4,7 @@ import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Download, Filter, Pri
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import authUtils from '../utils/authUtils';
+import ChartDataLabels from 'chartjs-plugin-datalabels';
 
 // Import Chart.js components
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
@@ -19,7 +20,8 @@ ChartJS.register(
     Legend,
     ArcElement,
     PointElement,
-    LineElement
+    LineElement,
+    ChartDataLabels
 );
 
 const DuAnStatistics = () => {
@@ -384,7 +386,7 @@ const DuAnStatistics = () => {
         return monthlyAverages;
     };
 
-    // Get Chart.js data and options based on selected chart type
+    // Modify the getChartConfig function to display values on bars
     const getChartConfig = () => {
         const labels = months.slice(1).map(month => month);
 
@@ -411,6 +413,33 @@ const DuAnStatistics = () => {
                             return label;
                         }
                     }
+                },
+                datalabels: {
+                    align: 'center',
+                    anchor: 'end',
+                    formatter: function (value, context) {
+                        if (context.dataset.label.includes('Doanh thu')) {
+                            // Hiển thị doanh thu theo đơn vị triệu hoặc tỷ để gọn hơn
+                            if (value >= 1000000000) {
+                                return (value / 1000000000).toFixed(1) + ' tỷ';
+                            } else if (value >= 1000000) {
+                                return (value / 1000000).toFixed(0) + 'tr';
+                            } else {
+                                return value;
+                            }
+                        } else {
+                            return value;
+                        }
+                    },
+                    color: function (context) {
+                        return context.dataset.backgroundColor;
+                    },
+                    font: {
+                        weight: 'bold',
+                        size: 12,
+                    },
+                    offset: 0,
+                    padding: 0
                 }
             },
         };
@@ -428,30 +457,24 @@ const DuAnStatistics = () => {
                                 label: 'Tổng dự án',
                                 data: monthlyData.map(item => item.projectCount),
                                 backgroundColor: '#4F46E5',
-                                yAxisID: 'y'
+                                yAxisID: 'y',
+                                datalabels: {
+                                    color: '#4F46E5',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
                             },
                             {
                                 type: 'bar',
-                                label: 'Hoàn thành',
-                                data: monthlyData.map(item => item.completedCount),
-                                backgroundColor: '#10B981',
-                                yAxisID: 'y'
-                            },
-                            {
-                                type: 'bar',
-                                label: 'Đang thực hiện',
-                                data: monthlyData.map(item => item.inProgressCount),
-                                backgroundColor: '#F59E0B',
-                                yAxisID: 'y'
-                            },
-                            {
-                                type: 'line',
                                 label: 'Doanh thu',
                                 data: monthlyData.map(item => item.totalRevenue),
-                                borderColor: '#EC4899',
-                                backgroundColor: 'rgba(236, 72, 153, 0.1)',
+                                backgroundColor: '#EC4899',
                                 yAxisID: 'y1',
-                                tension: 0.1
+                                datalabels: {
+                                    color: '#EC4899',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
                             }
                         ]
                     },
@@ -497,38 +520,33 @@ const DuAnStatistics = () => {
             case 'cumulative': {
                 const cumulativeData = prepareCumulativeData();
                 return {
-                    type: 'line',
+                    type: 'bar',
                     data: {
                         labels: cumulativeData.map(item => item.monthName),
                         datasets: [
                             {
-                                type: 'line',
+                                type: 'bar',
                                 label: 'Dự án tích lũy',
                                 data: cumulativeData.map(item => item.projectCount),
-                                borderColor: '#4F46E5',
-                                backgroundColor: 'rgba(79, 70, 229, 0.1)',
-                                fill: true,
-                                tension: 0.1,
-                                yAxisID: 'y'
+                                backgroundColor: '#4F46E5',
+                                yAxisID: 'y',
+                                datalabels: {
+                                    color: '#4F46E5',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
                             },
                             {
-                                type: 'line',
-                                label: 'HSHC tích lũy',
-                                data: cumulativeData.map(item => item.totalHSHC),
-                                borderColor: '#10B981',
-                                backgroundColor: 'rgba(16, 185, 129, 0.1)',
-                                fill: true,
-                                tension: 0.1,
-                                yAxisID: 'y'
-                            },
-                            {
-                                type: 'line',
+                                type: 'bar',
                                 label: 'Doanh thu tích lũy',
                                 data: cumulativeData.map(item => item.totalRevenue),
-                                borderColor: '#EC4899',
-                                backgroundColor: 'rgba(236, 72, 153, 0.05)',
-                                tension: 0.1,
-                                yAxisID: 'y1'
+                                backgroundColor: '#EC4899',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#EC4899',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
                             }
                         ]
                     },
@@ -583,31 +601,24 @@ const DuAnStatistics = () => {
                                 label: `Số dự án ${filterYear}`,
                                 data: averageData.map(item => item.currentYearCount),
                                 backgroundColor: '#4F46E5',
-                                yAxisID: 'y'
+                                yAxisID: 'y',
+                                datalabels: {
+                                    color: '#4F46E5',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
                             },
                             {
                                 type: 'bar',
-                                label: 'Số dự án trung bình',
-                                data: averageData.map(item => item.avgProjectCount),
-                                backgroundColor: '#9333EA',
-                                yAxisID: 'y'
-                            },
-                            {
-                                type: 'line',
                                 label: `Doanh thu ${filterYear}`,
                                 data: averageData.map(item => item.currentYearRevenue),
-                                borderColor: '#EC4899',
-                                tension: 0.1,
-                                yAxisID: 'y1'
-                            },
-                            {
-                                type: 'line',
-                                label: 'Doanh thu trung bình',
-                                data: averageData.map(item => item.avgRevenue),
-                                borderColor: '#F97316',
-                                borderDash: [5, 5],
-                                tension: 0.1,
-                                yAxisID: 'y1'
+                                backgroundColor: '#EC4899',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#EC4899',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
                             }
                         ]
                     },
@@ -640,7 +651,7 @@ const DuAnStatistics = () => {
                             ...commonOptions.plugins,
                             title: {
                                 display: true,
-                                text: `So sánh với trung bình các năm (${filterYear} vs. Trung bình)`,
+                                text: `So sánh với trung bình các năm (${filterYear})`,
                                 font: {
                                     size: 16
                                 }
@@ -654,6 +665,7 @@ const DuAnStatistics = () => {
                 return null;
         }
     };
+
 
     // Calculate summary statistics
     const statistics = useMemo(() => {
@@ -863,8 +875,8 @@ const DuAnStatistics = () => {
                                     key={number}
                                     onClick={() => handlePageChange(number)}
                                     className={`relative inline-flex items-center px-4 py-2 text-sm font-semibold ${currentPage === number
-                                            ? 'bg-indigo-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600'
-                                            : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
+                                        ? 'bg-indigo-600 text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600'
+                                        : 'text-gray-900 ring-1 ring-inset ring-gray-300 hover:bg-gray-50 focus:z-20 focus:outline-offset-0'
                                         }`}
                                 >
                                     {number}
@@ -995,7 +1007,7 @@ const DuAnStatistics = () => {
                                     </div>
 
                                     {/* Status filter */}
-                                    <div hidden>
+                                    <div >
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Trạng thái:</h3>
                                         <div className="relative">
                                             <select
@@ -1126,8 +1138,8 @@ const DuAnStatistics = () => {
                                 <button
                                     onClick={() => setChartType('monthly')}
                                     className={`px-3 py-1.5 text-xs font-medium rounded-md ${chartType === 'monthly'
-                                            ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
-                                            : 'bg-gray-100 text-gray-700 border-gray-200'
+                                        ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                                        : 'bg-gray-100 text-gray-700 border-gray-200'
                                         } border`}
                                 >
                                     Theo tháng
@@ -1135,8 +1147,8 @@ const DuAnStatistics = () => {
                                 <button
                                     onClick={() => setChartType('cumulative')}
                                     className={`px-3 py-1.5 text-xs font-medium rounded-md ${chartType === 'cumulative'
-                                            ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
-                                            : 'bg-gray-100 text-gray-700 border-gray-200'
+                                        ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                                        : 'bg-gray-100 text-gray-700 border-gray-200'
                                         } border`}
                                 >
                                     Tích lũy
@@ -1144,8 +1156,8 @@ const DuAnStatistics = () => {
                                 <button
                                     onClick={() => setChartType('average')}
                                     className={`px-3 py-1.5 text-xs font-medium rounded-md ${chartType === 'average'
-                                            ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
-                                            : 'bg-gray-100 text-gray-700 border-gray-200'
+                                        ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
+                                        : 'bg-gray-100 text-gray-700 border-gray-200'
                                         } border`}
                                 >
                                     So sánh TB

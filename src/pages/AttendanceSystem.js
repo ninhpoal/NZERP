@@ -638,7 +638,6 @@ const AttendanceSystem = () => {
                             paginationRowsPerPageOptions={[10, 25, 50, 100]}
                             highlightOnHover
                             responsive
-                            defaultSortFieldId={2}
                             defaultSortAsc={false}
                             progressPending={isLoading}
                             progressComponent={
