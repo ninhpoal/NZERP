@@ -9,6 +9,7 @@ import Profile from './pages/Profile';
 import Users from './pages/UserManagement';
 import MenuStructurePage from './pages/MenuStructurePage';
 import AttendanceSystem from './pages/AttendanceSystem';
+import DuAnStatistics from './pages/DuAnStatistics';
 
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
@@ -152,6 +153,14 @@ function App() {
                       requiredDepartments={["Hành chánh", "Giám đốc"]}>
 
                       <AttendanceSystem />
+                    </RoleProtectedRoute>
+                  } />
+                     {/* Trang quản lý người dùng - Chỉ ADMIN mới xem được */}
+                     <Route path="/Duantc" element={
+                    <RoleProtectedRoute requiredRoles={["Admin"]}
+                      requiredDepartments={["Hành chánh", "Giám đốc"]}>
+
+                      <DuAnStatistics />
                     </RoleProtectedRoute>
                   } />
 

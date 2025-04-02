@@ -126,8 +126,8 @@ const MenuStructurePage = () => {
                 {
                     text: 'Báo cáo',
                     icon: ChartPie,
-                    path: '/reports/finance',
-                    description: 'Báo cáo tài chính',
+                    path: '/Duantc',
+                    description: 'Báo cáo dự án',
                     permissions: {
                         PhanQuyen: ["Admin"],
                         Phong: ["Giám đốc"],
