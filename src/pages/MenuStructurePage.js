@@ -127,7 +127,7 @@ const MenuStructurePage = () => {
         
         {
             groupId: 4,
-            groupName: "Quản Lý Tài Chính",
+            groupName: "Tools",
             icon: Wallet,
             permissions: {
                 PhanQuyen: ["Admin"],
@@ -135,10 +135,10 @@ const MenuStructurePage = () => {
             },
             items: [
                 {
-                    text: 'Thu chi',
+                    text: 'Thêm dự án',
                     icon: Wallet,
-                    path: '/thuchi',
-                    description: 'Quản lý thu chi',
+                    path: '/addduan',
+                    description: 'Thêm dự án nhanh',
                     permissions: {
                         PhanQuyen: ["Admin"],
                         Phong: ["Hành chánh", "Giám đốc"],

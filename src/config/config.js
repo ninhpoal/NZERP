@@ -7,6 +7,7 @@ const config = {
     UPLOAD_PRESET : process.env.UPLOAD_PRESET,
     API_URL_Chamcong: process.env.REACT_APP_API_URL_Chamcong,
     ACCESS_KEY_Chamcong: process.env.REACT_APP_ACCESS_KEY_Chamcong,
+  
     get API_URL() {
         return `https://${this.REGION}.appsheet.com/api/v2/apps/${this.APP_ID}/tables`;
     },

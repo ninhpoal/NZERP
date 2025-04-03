@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="vi" oncontextmenu="return false">
+<html lang="vi">
 
 <head>
   <meta charset="UTF-8">
@@ -13,48 +13,72 @@
   <title>NZ ERP</title>
 
   <script>
-    // Chặn F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
-    document.onkeydown = function (e) {
-      if (
-        // F12
-        e.keyCode === 123 ||
-        // Ctrl+Shift+I
-        (e.ctrlKey && e.shiftKey && e.keyCode === 73) ||
-        // Ctrl+Shift+J
-        (e.ctrlKey && e.shiftKey && e.keyCode === 74) ||
-        // Ctrl+Shift+C
-        (e.ctrlKey && e.shiftKey && e.keyCode === 67) ||
-        // Ctrl+U
-        (e.ctrlKey && e.keyCode === 85)
-      ) {
-        return false;
+    document.addEventListener("DOMContentLoaded", function() {
+      // Kiểm tra xem có phải là localhost hay không
+      const isLocalhost = 
+        window.location.hostname === "localhost" || 
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname.includes("192.168.");
+      
+      // Chỉ áp dụng các biện pháp bảo vệ khi KHÔNG phải là localhost
+      if (!isLocalhost) {
+        // Thiết lập bảo vệ chống chuột phải
+        document.oncontextmenu = function() {
+          return false;
+        };
+        
+        // Chặn F12, Ctrl+Shift+I, Ctrl+Shift+J, Ctrl+U
+        document.addEventListener("keydown", function(e) {
+          if (
+            // F12
+            e.keyCode === 123 ||
+            // Ctrl+Shift+I
+            (e.ctrlKey && e.shiftKey && e.keyCode === 73) ||
+            // Ctrl+Shift+J
+            (e.ctrlKey && e.shiftKey && e.keyCode === 74) ||
+            // Ctrl+Shift+C
+            (e.ctrlKey && e.shiftKey && e.keyCode === 67) ||
+            // Ctrl+U
+            (e.ctrlKey && e.keyCode === 85)
+          ) {
+            e.preventDefault();
+            return false;
+          }
+        }, true);
+
+        // Chặn DevTools Detector (chỉ khi không phải localhost)
+        setInterval(function() {
+          const devtools = /./;
+          devtools.toString = function() {
+            window.location.href = "about:blank";
+            return "";
+          }
+          console.log(devtools);
+        }, 1000);
+        
+        // Ghi đè các phương thức console
+        (function() {
+          console.clear();
+          const originalLog = console.log;
+          const originalError = console.error;
+          const originalWarn = console.warn;
+          const originalInfo = console.info;
+          const originalDebug = console.debug;
+          
+          console.log = console.error = console.warn = console.info = console.debug = function() {
+            // Để trống hoặc thêm xử lý riêng ở đây
+          };
+          
+          // Thêm cảnh báo khi người dùng thử debug
+          Object.defineProperty(document, 'cookie', {
+            get: function() {
+              originalWarn("Cảnh báo: Truy cập Cookie được phát hiện");
+              return "";
+            }
+          });
+        })();
       }
-    };
-
-    // Cách khác an toàn hơn với Safari
-    (function () {
-      // Chỉ sử dụng console.clear() để xóa console
-      console.clear();
-      // Ghi đè một số phương thức console
-      const originalLog = console.log;
-      const originalError = console.error;
-      const originalWarn = console.warn;
-      const originalInfo = console.info;
-      const originalDebug = console.debug;
-
-      console.log = console.error = console.warn = console.info = console.debug = function () {
-        // Bạn có thể để trống hoặc thêm xử lý riêng ở đây
-      };
-
-      // Thêm cảnh báo khi người dùng thử debug
-      Object.defineProperty(document, 'cookie', {
-        get: function () {
-          // Chỉ log cảnh báo và không làm gì thêm
-          originalWarn("Cảnh báo: Truy cập Cookie được phát hiện");
-          return "";
-        }
-      });
-    })();
+    });
   </script>
 </head>
 

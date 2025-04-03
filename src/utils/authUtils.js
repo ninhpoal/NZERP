@@ -24,6 +24,46 @@ class AuthUtils {
             throw error;
         }
     }
+    async apiRequestErp(tableName, action, Properties = {}, data) {
+        const apiUrl = `https://www.appsheet.com/api/v2/apps/509dd5b5-bc8b-4962-8122-bbc6d3cf3f55/tables/${tableName}/Action`;
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'ApplicationAccessKey': 'V2-eztny-HRi4G-gHO8S-0N0TN-J3PSa-lKZ5q-7mlUT-oAnS2',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    Action: action,
+                    Properties: {
+                        Locale: 'vi-VN',
+                        Timezone: 'Asia/Ho_Chi_Minh',
+                        ...Properties
+                    },
+                    ...data
+                })
+            });
+            
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            // Check if response is empty
+            const text = await response.text();
+            if (!text) {
+                return {}; // Return empty object if response is empty
+            }
+            
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Error parsing JSON response:', e);
+                return {}; // Return empty object if parsing fails
+            }
+        } catch (error) {
+            console.error('API request failed:', error);
+            throw error;
+        }
+    }
+
     async apiRequestChamcong(tableName, action, data, select = {}) {
         try {
             const response = await fetch(`${config.API_URL_Chamcong}/${tableName}/Action`, {

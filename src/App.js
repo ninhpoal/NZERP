@@ -10,7 +10,7 @@ import Users from './pages/UserManagement';
 import MenuStructurePage from './pages/MenuStructurePage';
 import AttendanceSystem from './pages/AttendanceSystem';
 import DuAnStatistics from './pages/DuAnStatistics';
-
+import AddDuan from './pages/AddDuan';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
@@ -133,6 +133,13 @@ function App() {
                       requiredDepartments={["Hành chánh", "Giám đốc"]}>
 
                       <Users />
+                    </RoleProtectedRoute>
+                  } />
+                   <Route path="/addduan" element={
+                    <RoleProtectedRoute requiredRoles={["Admin"]}
+                      requiredDepartments={["Hành chánh", "Giám đốc"]}>
+
+                      <AddDuan />
                     </RoleProtectedRoute>
                   } />
 
