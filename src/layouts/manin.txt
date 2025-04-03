@@ -85,6 +85,8 @@ const MainLayout = ({ children }) => {
     const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
     const [isMobile, setIsMobile] = useState(isMobileDevice());
     const [searchQuery, setSearchQuery] = useState('');
+    // State for collapsed menu groups
+    const [collapsedGroups, setCollapsedGroups] = useState({});
 
     // State for page actions from child components
     const [pageActions, setPageActions] = useState([]);
@@ -140,38 +142,72 @@ const MainLayout = ({ children }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isProfileMenuOpen, isNotificationsOpen]);
 
-    // All menu items in a flat structure (no groups)
-    const menuItems = [
+    // Standalone menu items that don't need to be in a group
+    const standaloneMenuItems = [
         {
             text: 'Trang chủ',
             icon: Home,
             path: '/Home',
             description: 'Tổng hợp chức năng',
             permissions: { all: true } // Everyone can see Home
-        },
+        }
+    ];
+
+    // Định nghĩa menu với thông tin phân quyền (grouped items)
+    const menuItems = [
         {
-            text: 'Thu chi',
+            groupName: "Quản Lý Tài Chính",
             icon: Wallet,
-            path: '/thuchi',
-            description: 'Quản lý thu chi',
             permissions: {
                 roles: ["Admin"],
                 departments: ["Giám đốc", "Tài chính"],
                 positions: ["Kế toán"]
-            }
+            },
+            items: [
+                {
+                    text: 'Thu chi',
+                    icon: Wallet,
+                    path: '/thuchi',
+                    description: 'Quản lý thu chi',
+                    permissions: {
+                        roles: ["Admin"],
+                        departments: ["Giám đốc", "Tài chính"],
+                        positions: ["Kế toán"]
+                    }
+                },
+            ]
         },
         {
-            text: 'Quản lý người dùng',
-            icon: User,
-            path: '/users',
-            description: 'Quản lý người dùng',
+            groupName: "Cài Đặt",
+            icon: Settings,
             permissions: {
                 roles: ["Admin"],
                 departments: ["Giám đốc", "Hành chánh"],
                 positions: ["Kế toán"]
-            }
+            },
+            items: [
+                {
+                    text: 'Quản lý người dùng',
+                    icon: User,
+                    path: '/users',
+                    description: 'Quản lý người dùng',
+                    permissions: {
+                        roles: ["Admin"],
+                        departments: ["Giám đốc", "Hành chánh"],
+                        positions: ["Kế toán"]
+                    }
+                }
+            ]
         }
     ];
+
+    // Function to toggle group collapse
+    const toggleGroupCollapse = (groupName) => {
+        setCollapsedGroups(prev => ({
+            ...prev,
+            [groupName]: !prev[groupName]
+        }));
+    };
 
     const handleLogout = () => {
         authUtils.logout();
@@ -188,6 +224,23 @@ const MainLayout = ({ children }) => {
     const notifications = [
         { id: 1, title: 'Chức năng đang xây dựng', message: 'Chức năng đang xây dựng', time: 'vừa xong', unread: true },
     ];
+
+    // Check if any menu item in a group is active
+    const isGroupActive = (group) => {
+        return group.items.some(item => location.pathname === item.path);
+    };
+
+    // Check if current page is in this group to auto-expand it
+    useEffect(() => {
+        menuItems.forEach(group => {
+            if (isGroupActive(group) && collapsedGroups[group.groupName]) {
+                setCollapsedGroups(prev => ({
+                    ...prev,
+                    [group.groupName]: false // Expand the group
+                }));
+            }
+        });
+    }, [location.pathname]);
 
     const Sidebar = () => (
         <div className={`flex flex-col h-full bg-white shadow-xl transition-all duration-300 ${isSidebarOpen ? 'w-[280px]' : 'w-[68px]'}`}>
@@ -267,8 +320,8 @@ const MainLayout = ({ children }) => {
 
             {/* Navigation */}
             <nav className={`flex-1 py-3 space-y-1 overflow-y-auto ${isSidebarOpen ? 'px-3' : 'px-2'}`}>
-                {/* Render all menu items in a flat structure */}
-                {menuItems
+                {/* Render standalone menu items first */}
+                {standaloneMenuItems
                     .filter(item => hasPermission(item, userData))
                     .map((item, index) => {
                         const Icon = item.icon;
@@ -315,6 +368,139 @@ const MainLayout = ({ children }) => {
                                     </div>
                                 )}
                             </button>
+                        );
+                    })}
+
+                {/* Divider between standalone items and groups */}
+                <div className="border-t my-2"></div>
+
+                {/* Then render grouped menu items */}
+                {menuItems
+                    // Filter groups user has permission to access
+                    .filter(group => hasPermission(group, userData))
+                    .map((group, groupIndex) => {
+                        const GroupIcon = group.icon;
+                        const isActive = isGroupActive(group);
+                        const isCollapsed = collapsedGroups[group.groupName];
+
+                        // Filter items user has permission to access
+                        const accessibleItems = group.items.filter(item => hasPermission(item, userData));
+
+                        // Don't show group if no accessible items
+                        if (accessibleItems.length === 0) {
+                            return null;
+                        }
+
+                        return (
+                            <div key={groupIndex} className="mb-2">
+                                {/* Group Header */}
+                                <button
+                                    className={`w-full flex ${!isSidebarOpen ? 'justify-center' : 'items-center justify-between'} 
+                                        ${isSidebarOpen ? 'px-4' : 'px-2'} py-2.5 rounded-lg transition-all duration-200
+                                        ${isActive ? 'bg-[#002266]/5 text-[#003399]' : 'text-gray-600 hover:bg-gray-50'}`}
+                                    onClick={() => isSidebarOpen && toggleGroupCollapse(group.groupName)}
+                                    title={!isSidebarOpen ? group.groupName : undefined}
+                                >
+                                    <div className={`flex items-center ${isSidebarOpen ? 'space-x-2' : ''}`}>
+                                        <div className={`flex items-center justify-center w-6 h-6 rounded-md ${isActive ? 'bg-gradient-to-r from-[#002266] to-[#003399] text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                            <GroupIcon className="h-3.5 w-3.5" />
+                                        </div>
+                                        {isSidebarOpen && (
+                                            <span className="text-xs font-semibold uppercase tracking-wider">
+                                                {group.groupName}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {isSidebarOpen && (
+                                        <div className={`rounded-full p-1 ${isActive ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                            {isCollapsed ?
+                                                <ChevronRight className="h-3.5 w-3.5 text-gray-500" /> :
+                                                <ChevronDown className="h-3.5 w-3.5 text-gray-500" />
+                                            }
+                                        </div>
+                                    )}
+                                </button>
+
+                                {/* Group Items - Only shown when sidebar is open and group is not collapsed */}
+                                {isSidebarOpen && !isCollapsed && (
+                                    <div className="ml-3 mt-1 space-y-1">
+                                        {accessibleItems.map((item) => {
+                                            const Icon = item.icon;
+                                            const isItemActive = location.pathname === item.path;
+                                            return (
+                                                <button
+                                                    key={item.text}
+                                                    onClick={() => {
+                                                        if (item.isLogout) {
+                                                            handleLogout();
+                                                        }
+                                                        else if (item.isExternal) {
+                                                            if (item.requiresUserParam && userData) {
+                                                                const finalUrl = `${item.path}`;
+                                                                window.location.href = finalUrl;
+                                                            } else {
+                                                                window.open(item.path, '_blank');
+                                                            }
+                                                        } else {
+                                                            navigate(item.path);
+                                                        }
+                                                        isMobile && setIsSidebarOpen(false);
+                                                    }}
+                                                    className={`w-full flex items-center space-x-3 px-4 py-2.5 rounded-lg transition-all duration-200 group
+                                                        ${isItemActive
+                                                            ? 'bg-gradient-to-r from-[#b7a035]/10 to-[#d99c07]/10 text-[#b7a035] shadow-sm'
+                                                            : 'text-gray-600 hover:bg-gray-50'
+                                                        }
+                                                    `}
+                                                    title={item.description}
+                                                >
+                                                    <div className={`flex items-center justify-center w-7 h-7 rounded-md ${isItemActive ? 'bg-gradient-to-r from-[#b7a035] to-[#d99c07] text-white' : 'bg-gray-100 text-gray-500 group-hover:text-[#b7a035] group-hover:bg-gray-200'} transition-colors`}>
+                                                        <Icon className="h-3.5 w-3.5" />
+                                                    </div>
+                                                    <div className="flex flex-col items-start">
+                                                        <span className={`font-medium text-sm ${isItemActive ? 'text-[#b7a035]' : 'text-gray-700'}`}>
+                                                            {item.text}
+                                                        </span>
+                                                        {isItemActive && item.description && (
+                                                            <span className="text-xs text-gray-400 mt-0.5">{item.description}</span>
+                                                        )}
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+
+                                {/* When sidebar is collapsed, show just the icons for this group */}
+                                {!isSidebarOpen && (
+                                    <div className="mt-1 space-y-1">
+                                        {accessibleItems.map((item) => {
+                                            const Icon = item.icon;
+                                            const isItemActive = location.pathname === item.path;
+                                            return (
+                                                <button
+                                                    key={item.text}
+                                                    onClick={() => {
+                                                        navigate(item.path);
+                                                        isMobile && setIsSidebarOpen(false);
+                                                    }}
+                                                    className={`w-full flex justify-center px-2 py-2 rounded-lg transition-all duration-200 group
+                                                        ${isItemActive
+                                                            ? 'bg-gradient-to-r from-[#b7a035]/10 to-[#d99c07]/10 text-[#b7a035] shadow-sm'
+                                                            : 'text-gray-600 hover:bg-gray-50'
+                                                        }
+                                                    `}
+                                                    title={`${item.text} - ${item.description || ''}`}
+                                                >
+                                                    <div className={`flex items-center justify-center w-7 h-7 rounded-md ${isItemActive ? 'bg-gradient-to-r from-[#b7a035] to-[#d99c07] text-white' : 'bg-gray-100 text-gray-500 group-hover:text-[#b7a035] group-hover:bg-gray-200'} transition-colors`}>
+                                                        <Icon className="h-3.5 w-3.5" />
+                                                    </div>
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         );
                     })}
             </nav>
@@ -391,7 +577,7 @@ const MainLayout = ({ children }) => {
                                                         ? 'Hỗ trợ' :
                                                         location.pathname === '/settings'
                                                             ? 'Cài đặt'
-                                                            : menuItems.find(item => item.path === location.pathname)?.text || 'Trang khác'}
+                                                            : [...standaloneMenuItems, ...menuItems.flatMap(group => group.items)].find(item => item.path === location.pathname)?.text || 'Trang khác'}
                                         </h2>
                                     </>
                                 )}

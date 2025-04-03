@@ -17,6 +17,9 @@ const LoginPage = () => {
     });
 
     useEffect(() => {
+        // Clear any previous toast messages when component mounts
+        toast.dismiss();
+
         if (authUtils.isAuthenticated()) {
             const returnUrl = localStorage.getItem('returnUrl');
             if (returnUrl) {
@@ -37,16 +40,32 @@ const LoginPage = () => {
 
     const handleSubmit = async (e) => {
         e.preventDefault();
+
+        // Prevent multiple submissions
+        if (loading) return;
+
+        // Dismiss any existing toasts to prevent duplicates
+        toast.dismiss();
+
         if (!formData.username || !formData.password) {
-            toast.error('Vui lòng nhập đầy đủ thông tin đăng nhập!');
+            toast.error('Vui lòng nhập đầy đủ thông tin đăng nhập!', {
+                autoClose: 3000,
+                pauseOnHover: true
+            });
             return;
         }
 
         setLoading(true);
         try {
             const user = await authUtils.login(formData.username, formData.password);
-            toast.success(`Chào mừng ${user.username} đã quay trở lại!`);
 
+            // Show success message with consistent timing
+            toast.success(`Chào mừng ${user.username} đã quay trở lại!`, {
+                autoClose: 1500,
+                pauseOnHover: false
+            });
+
+            // Use a consistent timeout for navigation that matches toast duration
             setTimeout(() => {
                 const returnUrl = localStorage.getItem('returnUrl');
                 if (returnUrl) {
@@ -56,8 +75,12 @@ const LoginPage = () => {
                     navigate(config.ROUTES.MENU);
                 }
             }, 1500);
+
         } catch (error) {
-            toast.error(error.message);
+            toast.error(error.message, {
+                autoClose: 4000,
+                pauseOnHover: true
+            });
         } finally {
             setLoading(false);
         }
