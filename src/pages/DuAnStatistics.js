@@ -37,7 +37,15 @@ const DuAnStatistics = () => {
     const [sortConfig, setSortConfig] = useState({ key: 'Ngày nhận kế hoạch', direction: 'descending' });
     const [showFilters, setShowFilters] = useState(false);
     const [chartType, setChartType] = useState('monthly'); // 'monthly', 'cumulative', 'average'
+    const [filterCheck, setFilterCheck] = useState('TẤT CẢ');
+    const checkValues = ['TẤT CẢ', 'Đạt', 'Trung bình', 'Xấu', 'Chưa đánh giá'];
+    const trangThai = ['TẤT CẢ', '1/ Nhận Kế Hoạch', '2/ Đang thi công', '3/ Xự cố',
 
+        '4/ Chờ cắt chuyển', '5/ Chờ thay đổi phương án', '6/ Thiếu vật tư', '7/ Đã thi công xong', '8/ Đã hoàn thành BCHN',
+        '9/ Duyệt sản phẩm', '10/ Nhập MBM - Hoàn công', '11/ Hoàn thành hoàn công', '12/ Đã nghiệm thu', '13/ Đã xuất hóa đơn'
+        ,
+        '14/ Đã thanh toán', '15/ Hoàn thành'
+    ];
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
@@ -52,13 +60,18 @@ const DuAnStatistics = () => {
             const response = await authUtils.apiRequest('DUAN', 'Find', {});
 
             // Transform data to ensure dates are properly formatted and numeric values are numbers
+            // Trong phần transform data của fetchProjects
             const transformedData = response.map(project => ({
                 ...project,
                 'Ngày nhận kế hoạch': project['Ngày nhận kế hoạch'] ? new Date(project['Ngày nhận kế hoạch']) : null,
                 'Ngày hoàn tất dự án': project['Ngày hoàn tất dự án'] ? new Date(project['Ngày hoàn tất dự án']) : null,
                 'Số tiền HSHC Trước thuế': parseFloat(project['Số tiền HSHC Trước thuế']) || 0,
                 'Doanh thu tạm tính': parseFloat(project['Doanh thu tạm tính']) || 0,
-                'Tháng': project['Tháng'] || (project['Ngày nhận kế hoạch'] ? new Date(project['Ngày nhận kế hoạch']).getMonth() + 1 : null)
+                'Nội suy kéo': parseFloat(project['Nội suy kéo']) || 0,
+                'Nội suy hàn': parseFloat(project['Nội suy hàn']) || 0,
+                'Doanh thu nội suy': (parseFloat(project['Nội suy kéo']) || 0) + (parseFloat(project['Nội suy hàn']) || 0),
+                'Tháng': project['Tháng'] || (project['Ngày nhận kế hoạch'] ? new Date(project['Ngày nhận kế hoạch']).getMonth() + 1 : null),
+                'Check': project['Check'] || 'Chưa đánh giá'
             }));
 
             setProjects(transformedData);
@@ -197,6 +210,7 @@ const DuAnStatistics = () => {
 
             const matchesArea = filterArea === 'TẤT CẢ' || project['Khu vực'] === filterArea;
             const matchesStatus = filterStatus === 'TẤT CẢ' || project['Trạng thái'] === filterStatus;
+            const matchesCheck = filterCheck === 'TẤT CẢ' || project['Check'] === filterCheck; // Thêm dòng này
 
             const projectYear = project['Ngày nhận kế hoạch']
                 ? new Date(project['Ngày nhận kế hoạch']).getFullYear()
@@ -213,16 +227,71 @@ const DuAnStatistics = () => {
 
             const matchesBudget = projectMatchesBudget(project, filterBudget);
 
-            return matchesSearch && matchesArea && matchesStatus && matchesYear && matchesMonth && matchesBudget;
+            return matchesSearch && matchesArea && matchesStatus && matchesYear && matchesMonth && matchesBudget && matchesCheck;
         });
-    }, [getSortedItems, search, filterArea, filterStatus, filterYear, filterMonth, filterBudget]);
+    }, [getSortedItems, search, filterArea, filterStatus, filterYear, filterMonth, filterBudget, filterCheck]);
 
     // Pagination calculations
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
     const currentItems = filteredItems.slice(indexOfFirstItem, indexOfLastItem);
     const totalPages = Math.ceil(filteredItems.length / itemsPerPage);
+    const calculateAreaStatistics = () => {
+        const areaStats = {};
 
+        areas.filter(area => area !== 'TẤT CẢ').forEach(area => {
+            const areaProjects = filteredItems.filter(project => project['Khu vực'] === area);
+
+            areaStats[area] = {
+                projectCount: areaProjects.length,
+                estimatedRevenue: areaProjects.reduce((sum, project) => sum + (project['Doanh thu tạm tính'] || 0), 0),
+                actualRevenue: areaProjects.reduce((sum, project) => sum + (project['Số tiền HSHC Trước thuế'] || 0), 0),
+                derivedRevenue: areaProjects.reduce((sum, project) => sum + (project['Doanh thu nội suy'] || 0), 0),
+            };
+        });
+
+        return areaStats;
+    };
+
+    // Thêm hàm để tính toán thống kê theo trạng thái
+    const calculateStatusStatistics = () => {
+        const statusStats = {};
+
+        statuses.filter(status => status !== 'TẤT CẢ').forEach(status => {
+            const statusProjects = filteredItems.filter(project => project['Trạng thái'] === status);
+
+            statusStats[status] = {
+                projectCount: statusProjects.length,
+                estimatedRevenue: statusProjects.reduce((sum, project) => sum + (project['Doanh thu tạm tính'] || 0), 0),
+                actualRevenue: statusProjects.reduce((sum, project) => sum + (project['Số tiền HSHC Trước thuế'] || 0), 0),
+                derivedRevenue: statusProjects.reduce((sum, project) => sum + (project['Doanh thu nội suy'] || 0), 0),
+            };
+        });
+
+        return statusStats;
+    };
+    // Thêm hàm để tính toán thống kê theo tháng
+    const calculateMonthlyStatistics = () => {
+        const monthlyStats = {};
+
+        for (let month = 1; month <= 12; month++) {
+            const monthName = `Tháng ${month}`;
+            const monthProjects = filteredItems.filter(project => {
+                if (!project['Ngày nhận kế hoạch']) return false;
+                const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                return projectDate.getMonth() + 1 === month && projectDate.getFullYear() === filterYear;
+            });
+
+            monthlyStats[monthName] = {
+                projectCount: monthProjects.length,
+                estimatedRevenue: monthProjects.reduce((sum, project) => sum + (project['Doanh thu tạm tính'] || 0), 0),
+                actualRevenue: monthProjects.reduce((sum, project) => sum + (project['Số tiền HSHC Trước thuế'] || 0), 0),
+                derivedRevenue: monthProjects.reduce((sum, project) => sum + (project['Doanh thu nội suy'] || 0), 0),
+            };
+        }
+
+        return monthlyStats;
+    };
     // Prepare monthly data for charts
     const prepareMonthlyData = () => {
         // Initialize array with all months
@@ -386,285 +455,434 @@ const DuAnStatistics = () => {
         return monthlyAverages;
     };
 
-    // Modify the getChartConfig function to display values on bars
-    const getChartConfig = () => {
-        const labels = months.slice(1).map(month => month);
+    // Modify the getChartConfig function to include all revenue types
+const getChartConfig = () => {
+    const labels = months.slice(1).map(month => month);
 
-        // Common options for all chart types
-        const commonOptions = {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: {
-                    position: 'top',
-                },
-                tooltip: {
-                    callbacks: {
-                        label: function (context) {
-                            let label = context.dataset.label || '';
-                            if (label) {
-                                label += ': ';
-                            }
-                            if (context.dataset.label.includes('Doanh thu')) {
-                                label += formatCurrency(context.parsed.y);
-                            } else {
-                                label += context.parsed.y;
-                            }
-                            return label;
+    // Common options for all chart types
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+            legend: {
+                position: 'top',
+            },
+            tooltip: {
+                callbacks: {
+                    label: function (context) {
+                        let label = context.dataset.label || '';
+                        if (label) {
+                            label += ': ';
                         }
-                    }
-                },
-                datalabels: {
-                    align: 'center',
-                    anchor: 'end',
-                    formatter: function (value, context) {
                         if (context.dataset.label.includes('Doanh thu')) {
-                            // Hiển thị doanh thu theo đơn vị triệu hoặc tỷ để gọn hơn
-                            if (value >= 1000000000) {
-                                return (value / 1000000000).toFixed(1) + ' tỷ';
-                            } else if (value >= 1000000) {
-                                return (value / 1000000).toFixed(0) + 'tr';
-                            } else {
-                                return value;
-                            }
+                            label += formatCurrency(context.parsed.y);
+                        } else {
+                            label += context.parsed.y;
+                        }
+                        return label;
+                    }
+                }
+            },
+            datalabels: {
+                align: 'center',
+                anchor: 'end',
+                formatter: function (value, context) {
+                    if (context.dataset.label.includes('Doanh thu')) {
+                        // Hiển thị doanh thu theo đơn vị triệu hoặc tỷ để gọn hơn
+                        if (value >= 1000000000) {
+                            return (value / 1000000000).toFixed(1) + ' tỷ';
+                        } else if (value >= 1000000) {
+                            return (value / 1000000).toFixed(0) + 'tr';
                         } else {
                             return value;
                         }
-                    },
-                    color: function (context) {
-                        return context.dataset.backgroundColor;
-                    },
-                    font: {
-                        weight: 'bold',
-                        size: 12,
-                    },
-                    offset: 0,
-                    padding: 0
-                }
-            },
-        };
-
-        switch (chartType) {
-            case 'monthly': {
-                const monthlyData = prepareMonthlyData();
-                return {
-                    type: 'bar',
-                    data: {
-                        labels: monthlyData.map(item => item.monthName),
-                        datasets: [
-                            {
-                                type: 'bar',
-                                label: 'Tổng dự án',
-                                data: monthlyData.map(item => item.projectCount),
-                                backgroundColor: '#4F46E5',
-                                yAxisID: 'y',
-                                datalabels: {
-                                    color: '#4F46E5',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: 'Doanh thu',
-                                data: monthlyData.map(item => item.totalRevenue),
-                                backgroundColor: '#EC4899',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#EC4899',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            }
-                        ]
-                    },
-                    options: {
-                        ...commonOptions,
-                        scales: {
-                            y: {
-                                type: 'linear',
-                                display: true,
-                                position: 'left',
-                                title: {
-                                    display: true,
-                                    text: 'Số lượng'
-                                }
-                            },
-                            y1: {
-                                type: 'linear',
-                                display: true,
-                                position: 'right',
-                                title: {
-                                    display: true,
-                                    text: 'Doanh thu (VNĐ)'
-                                },
-                                grid: {
-                                    drawOnChartArea: false
-                                }
-                            }
-                        },
-                        plugins: {
-                            ...commonOptions.plugins,
-                            title: {
-                                display: true,
-                                text: `Thống kê dự án theo tháng (Năm ${filterYear})`,
-                                font: {
-                                    size: 16
-                                }
-                            }
-                        }
+                    } else {
+                        return value;
                     }
-                };
+                },
+                color: function (context) {
+                    return context.dataset.backgroundColor;
+                },
+                font: {
+                    weight: 'bold',
+                    size: 12,
+                },
+                offset: 0,
+                padding: 0
             }
-
-            case 'cumulative': {
-                const cumulativeData = prepareCumulativeData();
-                return {
-                    type: 'bar',
-                    data: {
-                        labels: cumulativeData.map(item => item.monthName),
-                        datasets: [
-                            {
-                                type: 'bar',
-                                label: 'Dự án tích lũy',
-                                data: cumulativeData.map(item => item.projectCount),
-                                backgroundColor: '#4F46E5',
-                                yAxisID: 'y',
-                                datalabels: {
-                                    color: '#4F46E5',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: 'Doanh thu tích lũy',
-                                data: cumulativeData.map(item => item.totalRevenue),
-                                backgroundColor: '#EC4899',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#EC4899',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            }
-                        ]
-                    },
-                    options: {
-                        ...commonOptions,
-                        scales: {
-                            y: {
-                                type: 'linear',
-                                display: true,
-                                position: 'left',
-                                title: {
-                                    display: true,
-                                    text: 'Số lượng'
-                                }
-                            },
-                            y1: {
-                                type: 'linear',
-                                display: true,
-                                position: 'right',
-                                title: {
-                                    display: true,
-                                    text: 'Doanh thu (VNĐ)'
-                                },
-                                grid: {
-                                    drawOnChartArea: false
-                                }
-                            }
-                        },
-                        plugins: {
-                            ...commonOptions.plugins,
-                            title: {
-                                display: true,
-                                text: `Số liệu tích lũy theo thời gian (Năm ${filterYear})`,
-                                font: {
-                                    size: 16
-                                }
-                            }
-                        }
-                    }
-                };
-            }
-
-            case 'average': {
-                const averageData = prepareMonthlyAverages();
-                return {
-                    type: 'bar',
-                    data: {
-                        labels: averageData.map(item => item.monthName),
-                        datasets: [
-                            {
-                                type: 'bar',
-                                label: `Số dự án ${filterYear}`,
-                                data: averageData.map(item => item.currentYearCount),
-                                backgroundColor: '#4F46E5',
-                                yAxisID: 'y',
-                                datalabels: {
-                                    color: '#4F46E5',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: `Doanh thu ${filterYear}`,
-                                data: averageData.map(item => item.currentYearRevenue),
-                                backgroundColor: '#EC4899',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#EC4899',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            }
-                        ]
-                    },
-                    options: {
-                        ...commonOptions,
-                        scales: {
-                            y: {
-                                type: 'linear',
-                                display: true,
-                                position: 'left',
-                                title: {
-                                    display: true,
-                                    text: 'Số dự án'
-                                }
-                            },
-                            y1: {
-                                type: 'linear',
-                                display: true,
-                                position: 'right',
-                                title: {
-                                    display: true,
-                                    text: 'Doanh thu (VNĐ)'
-                                },
-                                grid: {
-                                    drawOnChartArea: false
-                                }
-                            }
-                        },
-                        plugins: {
-                            ...commonOptions.plugins,
-                            title: {
-                                display: true,
-                                text: `So sánh với trung bình các năm (${filterYear})`,
-                                font: {
-                                    size: 16
-                                }
-                            }
-                        }
-                    }
-                };
-            }
-
-            default:
-                return null;
-        }
+        },
     };
+
+    switch (chartType) {
+        case 'monthly': {
+            const monthlyData = prepareMonthlyData();
+            return {
+                type: 'bar',
+                data: {
+                    labels: monthlyData.map(item => item.monthName),
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Tổng dự án',
+                            data: monthlyData.map(item => item.projectCount),
+                            backgroundColor: '#4F46E5',
+                            yAxisID: 'y',
+                            datalabels: {
+                                color: '#4F46E5',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Doanh thu HSHC',
+                            data: monthlyData.map(item => item.totalRevenue),
+                            backgroundColor: '#EC4899',
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#EC4899',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Doanh thu tạm tính',
+                            data: monthlyData.map(item => {
+                                // Filter projects for this month
+                                const monthProjects = filteredItems.filter(project => {
+                                    if (!project['Ngày nhận kế hoạch']) return false;
+                                    const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                                    return projectDate.getMonth() + 1 === item.month && 
+                                           projectDate.getFullYear() === filterYear;
+                                });
+                                // Sum the estimated revenue
+                                return monthProjects.reduce((sum, project) => 
+                                    sum + (project['Doanh thu tạm tính'] || 0), 0);
+                            }),
+                            backgroundColor: '#10B981',
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#10B981',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Doanh thu nội suy',
+                            data: monthlyData.map(item => {
+                                // Filter projects for this month
+                                const monthProjects = filteredItems.filter(project => {
+                                    if (!project['Ngày nhận kế hoạch']) return false;
+                                    const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                                    return projectDate.getMonth() + 1 === item.month && 
+                                           projectDate.getFullYear() === filterYear;
+                                });
+                                // Sum the derived revenue
+                                return monthProjects.reduce((sum, project) => 
+                                    sum + (project['Doanh thu nội suy'] || 0), 0);
+                            }),
+                            backgroundColor: '#8B5CF6',
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#8B5CF6',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Số lượng'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Doanh thu (VNĐ)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        ...commonOptions.plugins,
+                        title: {
+                            display: true,
+                            text: `Thống kê dự án theo tháng (Năm ${filterYear})`,
+                            font: {
+                                size: 16
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        // Also update the cumulative case to include additional metrics
+        case 'cumulative': {
+            const cumulativeData = prepareCumulativeData();
+            
+            // Calculate cumulative values for estimated and derived revenue
+            const cumulativeEstimatedRevenue = [];
+            const cumulativeDerivedRevenue = [];
+            
+            let runningEstimated = 0;
+            let runningDerived = 0;
+            
+            for (let month = 1; month <= 12; month++) {
+                // Filter projects for this month and earlier in the selected year
+                const monthProjects = filteredItems.filter(project => {
+                    if (!project['Ngày nhận kế hoạch']) return false;
+                    const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                    return projectDate.getMonth() + 1 <= month && 
+                           projectDate.getFullYear() === filterYear;
+                });
+                
+                // Calculate cumulative revenues
+                runningEstimated = monthProjects.reduce((sum, project) => 
+                    sum + (project['Doanh thu tạm tính'] || 0), 0);
+                    
+                runningDerived = monthProjects.reduce((sum, project) => 
+                    sum + (project['Doanh thu nội suy'] || 0), 0);
+                    
+                cumulativeEstimatedRevenue.push(runningEstimated);
+                cumulativeDerivedRevenue.push(runningDerived);
+            }
+            
+            return {
+                type: 'bar',
+                data: {
+                    labels: cumulativeData.map(item => item.monthName),
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Dự án tích lũy',
+                            data: cumulativeData.map(item => item.projectCount),
+                            backgroundColor: '#4F46E5',
+                            yAxisID: 'y',
+                            datalabels: {
+                                color: '#4F46E5',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Doanh thu HSHC tích lũy',
+                            data: cumulativeData.map(item => item.totalRevenue),
+                            backgroundColor: '#EC4899',
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#EC4899',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Doanh thu tạm tính tích lũy',
+                            data: cumulativeEstimatedRevenue,
+                            backgroundColor: '#10B981',
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#10B981',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        },
+                        {
+                            type: 'bar',
+                            label: 'Doanh thu nội suy tích lũy',
+                            data: cumulativeDerivedRevenue,
+                            backgroundColor: '#8B5CF6',
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#8B5CF6',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Số lượng'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Doanh thu (VNĐ)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        ...commonOptions.plugins,
+                        title: {
+                            display: true,
+                            text: `Số liệu tích lũy theo thời gian (Năm ${filterYear})`,
+                            font: {
+                                size: 16
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        // Also update the average case similarly
+        case 'average': {
+            const averageData = prepareMonthlyAverages();
+            
+            // Calculate monthly data for estimated and derived revenue
+            const currentYearEstimatedRevenue = [];
+            const currentYearDerivedRevenue = [];
+            
+            for (let month = 1; month <= 12; month++) {
+                // Filter projects for this month in the selected year
+                const monthProjects = filteredItems.filter(project => {
+                    if (!project['Ngày nhận kế hoạch']) return false;
+                    const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                    return projectDate.getMonth() + 1 === month && 
+                           projectDate.getFullYear() === filterYear;
+                });
+                
+                // Calculate revenues
+                const estimatedRevenue = monthProjects.reduce((sum, project) => 
+                    sum + (project['Doanh thu tạm tính'] || 0), 0);
+                    
+                const derivedRevenue = monthProjects.reduce((sum, project) => 
+                    sum + (project['Doanh thu nội suy'] || 0), 0);
+                    
+                currentYearEstimatedRevenue.push(estimatedRevenue);
+                currentYearDerivedRevenue.push(derivedRevenue);
+            }
+            
+            return {
+                type: 'bar',
+                data: {
+                    labels: averageData.map(item => item.monthName),
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: `Số dự án ${filterYear}`,
+                            data: averageData.map(item => item.currentYearCount),
+                            backgroundColor: '#4F46E5',
+                            yAxisID: 'y',
+                            datalabels: {
+                                color: '#4F46E5',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        },
+                        {
+                            type: 'bar',
+                            label: `Doanh thu HSHC ${filterYear}`,
+                            data: averageData.map(item => item.currentYearRevenue),
+                            backgroundColor: '#EC4899',
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#EC4899',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        },
+                        {
+                            type: 'bar',
+                            label: `Doanh thu tạm tính ${filterYear}`,
+                            data: currentYearEstimatedRevenue,
+                            backgroundColor: '#10B981',
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#10B981',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        },
+                        {
+                            type: 'bar',
+                            label: `Doanh thu nội suy ${filterYear}`,
+                            data: currentYearDerivedRevenue,
+                            backgroundColor: '#8B5CF6',
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#8B5CF6',
+                                anchor: 'end',
+                                align: 'top'
+                            }
+                        }
+                    ]
+                },
+                options: {
+                    ...commonOptions,
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Số dự án'
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Doanh thu (VNĐ)'
+                            },
+                            grid: {
+                                drawOnChartArea: false
+                            }
+                        }
+                    },
+                    plugins: {
+                        ...commonOptions.plugins,
+                        title: {
+                            display: true,
+                            text: `So sánh với trung bình các năm (${filterYear})`,
+                            font: {
+                                size: 16
+                            }
+                        }
+                    }
+                }
+            };
+        }
+
+        default:
+            return null;
+    }
+};
 
 
     // Calculate summary statistics
@@ -701,7 +919,16 @@ const DuAnStatistics = () => {
                 }
             }
         });
+        // Thêm thống kê mới
+        const totalDerivedRevenue = filteredProjects.reduce((sum, project) =>
+            sum + (parseFloat(project['Nội suy kéo'] + project['Nội suy hàn']) || 0), 0);
 
+        const projectsByCheckStatus = {
+            'Đạt': filteredProjects.filter(project => project['Check'] === 'Đạt').length,
+            'Trung bình': filteredProjects.filter(project => project['Check'] === 'Trung bình').length,
+            'Xấu': filteredProjects.filter(project => project['Check'] === 'Xấu').length,
+            'Chưa đánh giá': filteredProjects.filter(project => !project['Check'] || project['Check'] === 'Chưa đánh giá').length
+        };
         const avgCompletionTime = projectsWithCompletionData > 0
             ? totalCompletionDays / projectsWithCompletionData
             : 0;
@@ -719,7 +946,9 @@ const DuAnStatistics = () => {
             inProgressProjects,
             avgRevenuePerProject: totalProjects > 0 ? totalRevenue / totalProjects : 0,
             avgCompletionTime,
-            avgMonthlyProjects
+            avgMonthlyProjects,
+            totalDerivedRevenue, // Thêm dòng này
+            projectsByCheckStatus // Thêm dòng này
         };
     }, [filteredItems]);
 
@@ -775,7 +1004,11 @@ const DuAnStatistics = () => {
                 'Ngày hoàn tất': formatDate(project['Ngày hoàn tất dự án']),
                 'Số tiền HSHC': project['Số tiền HSHC Trước thuế'] || 0,
                 'Doanh thu tạm tính': project['Doanh thu tạm tính'] || 0,
-                'Trạng thái': project['Trạng thái'] || ''
+                'Trạng thái': project['Trạng thái'] || '',
+                'Đánh giá': project['Check'] || 'Chưa đánh giá',
+                'Nội suy kéo': project['Nội suy kéo'] || 0,
+                'Nội suy hàn': project['Nội suy hàn'] || 0,
+                'Doanh thu nội suy': project['Nội suy hàn'] + project['Nội suy kéo'] || 0,
             }));
 
             // Create worksheet
@@ -1056,7 +1289,21 @@ const DuAnStatistics = () => {
                                             <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
                                         </div>
                                     </div>
-
+                                    <div>
+                                        <h3 className="text-sm font-medium text-gray-700 mb-2">Đánh giá:</h3>
+                                        <div className="relative">
+                                            <select
+                                                value={filterCheck}
+                                                onChange={(e) => setFilterCheck(e.target.value)}
+                                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 appearance-none pr-10"
+                                            >
+                                                {checkValues.map((value, index) => (
+                                                    <option key={index} value={value}>{value}</option>
+                                                ))}
+                                            </select>
+                                            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+                                        </div>
+                                    </div>
                                     {/* Budget filter */}
                                     <div hidden>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Ngân sách:</h3>
@@ -1176,7 +1423,86 @@ const DuAnStatistics = () => {
                             </div>
                         </div>
                     </div>
+                  
+                    {/* Bảng thống kê theo khu vực */}
+                    <div className="mb-8">
+                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Thống kê theo khu vực</h2>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Khu vực</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số công trình</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doanh thu tạm tính</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số tiền HSHC trước thuế</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doanh thu nội suy</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {Object.entries(calculateAreaStatistics()).map(([area, stats]) => (
+                                        <tr key={area}>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{area}</td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{stats.projectCount}</td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(stats.estimatedRevenue)}</td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(stats.actualRevenue)}</td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(stats.derivedRevenue)}</td>
+                                        </tr>
+                                    ))}
+                                    <tr className="bg-gray-50 font-medium">
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">Tổng cộng</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{statistics.totalProjects}</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{formatCurrency(statistics.totalEstimatedRevenue)}</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{formatCurrency(statistics.totalRevenue)}</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{formatCurrency(statistics.totalDerivedRevenue)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    {/* Bảng thống kê theo trạng thái */}
+                    <div className="mb-8">
+                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Thống kê theo trạng thái</h2>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số công trình</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doanh thu tạm tính</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số tiền HSHC trước thuế</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Doanh thu nội suy</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {trangThai.filter(status => status !== 'TẤT CẢ').map(status => {
+                                        const stats = calculateStatusStatistics()[status] || {
+                                            projectCount: 0,
+                                            estimatedRevenue: 0,
+                                            actualRevenue: 0,
+                                            derivedRevenue: 0
+                                        };
 
+                                        return (
+                                            <tr key={status}>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{status}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{stats.projectCount}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(stats.estimatedRevenue)}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(stats.actualRevenue)}</td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(stats.derivedRevenue)}</td>
+                                            </tr>
+                                        );
+                                    })}
+                                    <tr className="bg-gray-50 font-medium">
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">Tổng cộng</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{statistics.totalProjects}</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{formatCurrency(statistics.totalEstimatedRevenue)}</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{formatCurrency(statistics.totalRevenue)}</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{formatCurrency(statistics.totalDerivedRevenue)}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                     {/* Table Section */}
                     <div>
                         <h2 className="text-lg font-semibold text-gray-800 mb-4">Danh sách dự án</h2>
@@ -1219,6 +1545,26 @@ const DuAnStatistics = () => {
                                             onClick={() => requestSort('Trạng thái')}>
                                             Trạng thái {getSortIcon('Trạng thái')}
                                         </th>
+                                        <th scope="col"
+                                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => requestSort('Check')}>
+                                            Đánh giá {getSortIcon('Check')}
+                                        </th>
+                                        <th scope="col"
+                                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => requestSort('Nội suy kéo')}>
+                                            Nội suy kéo {getSortIcon('Nội suy kéo')}
+                                        </th>
+                                        <th scope="col"
+                                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => requestSort('Nội suy hàn')}>
+                                            Nội suy hàn {getSortIcon('Nội suy hàn')}
+                                        </th>
+                                        <th scope="col"
+                                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => requestSort('Doanh thu nội suy')}>
+                                            DT nội suy {getSortIcon('Doanh thu nội suy')}
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
@@ -1257,7 +1603,7 @@ const DuAnStatistics = () => {
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm">
                                                     <span className={`px-2 py-1 rounded-full text-xs font-medium 
-                                                     ${project['Trạng thái'] === 'Hoàn thành'
+                                                    ${project['Trạng thái'] === 'Hoàn thành'
                                                             ? 'bg-green-100 text-green-800'
                                                             : project['Trạng thái'] === 'Đang thực hiện'
                                                                 ? 'bg-blue-100 text-blue-800'
@@ -1265,6 +1611,28 @@ const DuAnStatistics = () => {
                                                         }`}>
                                                         {project['Trạng thái'] || 'Chưa xác định'}
                                                     </span>
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium 
+                                                    ${project['Check'] === 'Đạt'
+                                                            ? 'bg-green-100 text-green-800'
+                                                            : project['Check'] === 'Trung bình'
+                                                                ? 'bg-yellow-100 text-yellow-800'
+                                                                : project['Check'] === 'Xấu'
+                                                                    ? 'bg-red-100 text-red-800'
+                                                                    : 'bg-gray-100 text-gray-800'
+                                                        }`}>
+                                                        {project['Check'] || 'Chưa đánh giá'}
+                                                    </span>
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {formatCurrency(project['Nội suy kéo'])}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {formatCurrency(project['Nội suy hàn'])}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {formatCurrency(project['Doanh thu nội suy'])}
                                                 </td>
                                             </tr>
                                         ))

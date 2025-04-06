@@ -11,6 +11,7 @@ import MenuStructurePage from './pages/MenuStructurePage';
 import AttendanceSystem from './pages/AttendanceSystem';
 import DuAnStatistics from './pages/DuAnStatistics';
 import AddDuan from './pages/AddDuan';
+import DanhSachKeHoach from './pages/DanhSachKeHoach';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
@@ -160,6 +161,14 @@ function App() {
                       requiredDepartments={["Hành chánh", "Giám đốc"]}>
 
                       <AttendanceSystem />
+                    </RoleProtectedRoute>
+                  } />
+                    {/* Trang quản lý người dùng - Chỉ ADMIN mới xem được */}
+                    <Route path="/duankho" element={
+                    <RoleProtectedRoute requiredRoles={["Admin"]}
+                      requiredDepartments={["Hành chánh", "Giám đốc"]}>
+
+                      <DanhSachKeHoach />
                     </RoleProtectedRoute>
                   } />
                      {/* Trang quản lý người dùng - Chỉ ADMIN mới xem được */}

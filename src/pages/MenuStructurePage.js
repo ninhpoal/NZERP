@@ -42,6 +42,17 @@ const MenuStructurePage = () => {
                     permissions: { PhanQuyen: ["All"] }
                 },
                 {
+                    text: 'Dự án kho',
+                    icon: Home,
+                    path: '/duankho',
+                    description: 'NZ KHO',
+                    count: 0,
+                    permissions: {
+                        Phong: ["Hành chánh", "Giám đốc"],
+                        ChucVu: ["Kho"],
+
+                    }
+                }, {
                     text: 'NZ KHO ',
                     icon: Home,
                     path: 'https://www.appsheet.com/start/269a45b5-ce3b-463a-9ef7-d85322d32b46?refresh=1&platform=desktop',
@@ -79,7 +90,7 @@ const MenuStructurePage = () => {
                 Phong: ["Hành chánh", "Giám đốc"],
             },
             items: [
-              
+
                 {
                     text: 'Báo cáo dự án ',
                     icon: ChartPie,
@@ -121,10 +132,10 @@ const MenuStructurePage = () => {
                         Phong: ["Hành chánh", "Giám đốc"],
                     }
                 },
-               
+
             ]
         },
-        
+
         {
             groupId: 4,
             groupName: "Tools",
@@ -144,10 +155,10 @@ const MenuStructurePage = () => {
                         Phong: ["Hành chánh", "Giám đốc"],
                     }
                 },
-                
+
             ]
         },
-      
+
         {
             groupId: 7,
             groupName: "Cài Đặt",
