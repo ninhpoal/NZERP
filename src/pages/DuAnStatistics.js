@@ -57,7 +57,9 @@ const DuAnStatistics = () => {
     const fetchChiData = async () => {
         try {
           setLoading(true);
-          const response = await authUtils.apiRequest('CHI', 'Find', {});
+          const response = await authUtils.apiRequest('CHI', 'Find', {Properties: {
+            Selector: `Filter(CHI, and([TRẠNG THÁI] = "Đã giải ngân",[TKCHI]="BIDV Nam Phạm"))`
+        }});
           
           // Transform dữ liệu chi
           const transformedChiData = response.map(chi => ({
