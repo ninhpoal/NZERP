@@ -46,13 +46,37 @@ const DuAnStatistics = () => {
         ,
         '14/ Đã thanh toán', '15/ Hoàn thành'
     ];
+    const [chiData, setChiData] = useState([]);
+
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
     // Chart ref
     const chartRef = useRef(null);
-
+    const fetchChiData = async () => {
+        try {
+          setLoading(true);
+          const response = await authUtils.apiRequest('CHI', 'Find', {});
+          
+          // Transform dữ liệu chi
+          const transformedChiData = response.map(chi => ({
+            ...chi,
+            'Ngày giải ngân': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']) : null,
+            'SỐ TIỀN': parseFloat(chi['SỐ TIỀN']) || 0,
+            'Tháng': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']).getMonth() + 1 : null,
+            'Năm': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']).getFullYear() : null
+          }));
+          
+          setChiData(transformedChiData);
+          setLoading(false);
+        } catch (error) {
+          console.error('Error fetching chi data:', error);
+          toast.error('Lỗi khi tải dữ liệu chi tiêu');
+          setLoading(false);
+        }
+      };
+      
     // Fetch data
     const fetchProjects = async () => {
         try {
@@ -86,7 +110,9 @@ const DuAnStatistics = () => {
 
     useEffect(() => {
         fetchProjects();
-    }, []);
+        fetchChiData(); // Thêm dòng này
+      }, []);
+      
 
     // Reset pagination when filters change
     useEffect(() => {
@@ -100,8 +126,27 @@ const DuAnStatistics = () => {
             direction = 'descending';
         }
         setSortConfig({ key, direction });
-    };
-
+    };  
+    // Thêm hàm tính toán chi tiêu theo tháng
+const calculateMonthlyExpenses = () => {
+    const monthlyExpenses = Array(12).fill(0);
+    
+    // Lọc chi theo năm được chọn
+    const yearExpenses = chiData.filter(chi => {
+      if (!chi['Ngày giải ngân']) return false;
+      return chi['Năm'] === filterYear;
+    });
+    
+    // Tính tổng chi tiêu cho từng tháng
+    yearExpenses.forEach(chi => {
+      const month = chi['Tháng'] - 1; // Chuyển từ 1-12 sang 0-11 để khớp với array index
+      if (month >= 0 && month < 12) {
+        monthlyExpenses[month] += chi['SỐ TIỀN'];
+      }
+    });
+    
+    return monthlyExpenses;
+  };
     // Get sorted items
     const getSortedItems = useMemo(() => {
         const sortableItems = [...projects];
@@ -454,10 +499,39 @@ const DuAnStatistics = () => {
 
         return monthlyAverages;
     };
-
+// Thêm hàm để tính toán thống kê chi tiêu theo tháng
+const calculateMonthlyChiStatistics = () => {
+    const monthlyStats = {};
+  
+    for (let month = 1; month <= 12; month++) {
+      const monthName = `Tháng ${month}`;
+      const monthChiData = chiData.filter(chi => {
+        if (!chi['Ngày giải ngân']) return false;
+        const chiDate = new Date(chi['Ngày giải ngân']);
+        return chiDate.getMonth() + 1 === month && chiDate.getFullYear() === filterYear;
+      });
+  
+      monthlyStats[monthName] = {
+        chiCount: monthChiData.length,
+        totalAmount: monthChiData.reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0)
+      };
+    }
+  
+    return monthlyStats;
+  };
+  const calculateTotalExpenses = () => {
+    return chiData
+      .filter(chi => {
+        if (!chi['Ngày giải ngân']) return false;
+        return new Date(chi['Ngày giải ngân']).getFullYear() === filterYear;
+      })
+      .reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0);
+  };
     // Modify the getChartConfig function to include all revenue types
+// Modify the getChartConfig function to include all revenue types and expenses
 const getChartConfig = () => {
     const labels = months.slice(1).map(month => month);
+    const monthlyExpenses = calculateMonthlyExpenses();
 
     // Common options for all chart types
     const commonOptions = {
@@ -474,7 +548,7 @@ const getChartConfig = () => {
                         if (label) {
                             label += ': ';
                         }
-                        if (context.dataset.label.includes('Doanh thu')) {
+                        if (context.dataset.label.includes('Doanh thu') || context.dataset.label.includes('Chi tiêu')) {
                             label += formatCurrency(context.parsed.y);
                         } else {
                             label += context.parsed.y;
@@ -487,7 +561,7 @@ const getChartConfig = () => {
                 align: 'center',
                 anchor: 'end',
                 formatter: function (value, context) {
-                    if (context.dataset.label.includes('Doanh thu')) {
+                    if (context.dataset.label.includes('Doanh thu') || context.dataset.label.includes('Chi tiêu')) {
                         // Hiển thị doanh thu theo đơn vị triệu hoặc tỷ để gọn hơn
                         if (value >= 1000000000) {
                             return (value / 1000000000).toFixed(1) + ' tỷ';
@@ -590,6 +664,22 @@ const getChartConfig = () => {
                                 anchor: 'end',
                                 align: 'top'
                             }
+                        },
+                        {
+                            type: 'line',
+                            label: 'Chi tiêu',
+                            data: monthlyExpenses,
+                            borderColor: '#F59E0B',
+                            backgroundColor: '#F59E0B',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.4,
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#F59E0B',
+                                anchor: 'end',
+                                align: 'top'
+                            }
                         }
                     ]
                 },
@@ -611,7 +701,7 @@ const getChartConfig = () => {
                             position: 'right',
                             title: {
                                 display: true,
-                                text: 'Doanh thu (VNĐ)'
+                                text: 'Doanh thu/Chi tiêu (VNĐ)'
                             },
                             grid: {
                                 drawOnChartArea: false
@@ -632,16 +722,17 @@ const getChartConfig = () => {
             };
         }
 
-        // Also update the cumulative case to include additional metrics
         case 'cumulative': {
             const cumulativeData = prepareCumulativeData();
             
             // Calculate cumulative values for estimated and derived revenue
             const cumulativeEstimatedRevenue = [];
             const cumulativeDerivedRevenue = [];
+            const cumulativeExpenses = [];
             
             let runningEstimated = 0;
             let runningDerived = 0;
+            let runningExpenses = 0;
             
             for (let month = 1; month <= 12; month++) {
                 // Filter projects for this month and earlier in the selected year
@@ -658,9 +749,21 @@ const getChartConfig = () => {
                     
                 runningDerived = monthProjects.reduce((sum, project) => 
                     sum + (project['Doanh thu nội suy'] || 0), 0);
+                
+                // Calculate cumulative expenses
+                const monthExpenses = chiData.filter(chi => {
+                    if (!chi['Ngày giải ngân']) return false;
+                    const chiDate = new Date(chi['Ngày giải ngân']);
+                    return chiDate.getMonth() + 1 <= month && 
+                           chiDate.getFullYear() === filterYear;
+                });
+                
+                runningExpenses = monthExpenses.reduce((sum, chi) => 
+                    sum + (chi['SỐ TIỀN'] || 0), 0);
                     
                 cumulativeEstimatedRevenue.push(runningEstimated);
                 cumulativeDerivedRevenue.push(runningDerived);
+                cumulativeExpenses.push(runningExpenses);
             }
             
             return {
@@ -715,6 +818,22 @@ const getChartConfig = () => {
                                 anchor: 'end',
                                 align: 'top'
                             }
+                        },
+                        {
+                            type: 'line',
+                            label: 'Chi tiêu tích lũy',
+                            data: cumulativeExpenses,
+                            borderColor: '#F59E0B',
+                            backgroundColor: '#F59E0B',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.4,
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#F59E0B',
+                                anchor: 'end',
+                                align: 'top'
+                            }
                         }
                     ]
                 },
@@ -736,7 +855,7 @@ const getChartConfig = () => {
                             position: 'right',
                             title: {
                                 display: true,
-                                text: 'Doanh thu (VNĐ)'
+                                text: 'Doanh thu/Chi tiêu (VNĐ)'
                             },
                             grid: {
                                 drawOnChartArea: false
@@ -757,9 +876,9 @@ const getChartConfig = () => {
             };
         }
 
-        // Also update the average case similarly
         case 'average': {
             const averageData = prepareMonthlyAverages();
+            const monthlyExpenses = calculateMonthlyExpenses();
             
             // Calculate monthly data for estimated and derived revenue
             const currentYearEstimatedRevenue = [];
@@ -837,6 +956,22 @@ const getChartConfig = () => {
                                 anchor: 'end',
                                 align: 'top'
                             }
+                        },
+                        {
+                            type: 'line',
+                            label: `Chi tiêu ${filterYear}`,
+                            data: monthlyExpenses,
+                            borderColor: '#F59E0B',
+                            backgroundColor: '#F59E0B',
+                            borderWidth: 2,
+                            fill: false,
+                            tension: 0.4,
+                            yAxisID: 'y1',
+                            datalabels: {
+                                color: '#F59E0B',
+                                anchor: 'end',
+                                align: 'top'
+                            }
                         }
                     ]
                 },
@@ -858,7 +993,7 @@ const getChartConfig = () => {
                             position: 'right',
                             title: {
                                 display: true,
-                                text: 'Doanh thu (VNĐ)'
+                                text: 'Doanh thu/Chi tiêu (VNĐ)'
                             },
                             grid: {
                                 drawOnChartArea: false
@@ -883,7 +1018,6 @@ const getChartConfig = () => {
             return null;
     }
 };
-
 
     // Calculate summary statistics
     const statistics = useMemo(() => {
@@ -1343,7 +1477,7 @@ const getChartConfig = () => {
                     </div>
 
                     {/* Statistics cards */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
                         <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
                             <h3 className="text-sm text-blue-700 mb-1">Tổng số dự án</h3>
                             <p className="text-2xl font-bold text-blue-800">{statistics.totalProjects}</p>
@@ -1375,6 +1509,14 @@ const getChartConfig = () => {
                                 TB: {formatCurrency(statistics.avgRevenuePerProject)}/dự án
                             </p>
                         </div>
+                        {/* Thêm vào phần Statistics cards */}
+<div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
+  <h3 className="text-sm text-amber-700 mb-1">Tổng chi tiêu</h3>
+  <p className="text-xl font-bold text-amber-800">{formatCurrency(calculateTotalExpenses())}</p>
+  <p className="text-xs text-amber-600 mt-1">
+    {chiData.filter(chi => chi['Năm'] === filterYear).length} phiếu chi
+  </p>
+</div>
                     </div>
 
                     {/* Charts Section */}
@@ -1652,6 +1794,108 @@ const getChartConfig = () => {
                             <PaginationControls />
                         )}
                     </div>
+                    {/* Bảng thống kê chi tiêu theo tháng */}
+<div className="mb-8">
+  <h2 className="text-lg font-semibold text-gray-800 mb-4">Thống kê chi tiêu theo tháng</h2>
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tháng</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số phiếu chi</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tổng chi tiêu</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {Object.entries(calculateMonthlyChiStatistics()).map(([month, stats]) => (
+          <tr key={month}>
+            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{month}</td>
+            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{stats.chiCount}</td>
+            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(stats.totalAmount)}</td>
+          </tr>
+        ))}
+        <tr className="bg-gray-50 font-medium">
+          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">Tổng cộng</td>
+          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+            {chiData.filter(chi => chi['Năm'] === filterYear).length}
+          </td>
+          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+            {formatCurrency(calculateTotalExpenses())}
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{/* Danh sách chi tiêu (tùy chọn) - có thể thêm vào nếu muốn hiển thị danh sách chi tiêu chi tiết */}
+<div className="mb-8">
+  <h2 className="text-lg font-semibold text-gray-800 mb-4">Danh sách chi tiêu</h2>
+  <div className="overflow-x-auto">
+    <table className="min-w-full divide-y divide-gray-200">
+      <thead className="bg-gray-50">
+        <tr>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã chuyển khoản</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Khu vực</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dự án</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã CHI</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày giải ngân</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số tiền</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đối tượng</th>
+          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+        </tr>
+      </thead>
+      <tbody className="bg-white divide-y divide-gray-200">
+        {chiData
+          .filter(chi => chi['Năm'] === filterYear)
+          .slice(0, 10) // Giới hạn số lượng hiển thị
+          .map((chi, index) => (
+            <tr key={index} className="hover:bg-gray-50 transition-colors">
+              <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                {chi['Mã chuyển khoản'] || '—'}
+              </td>
+              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                {chi['KHU VỰC'] || '—'}
+              </td>
+              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                {chi['Dự án'] || '—'}
+              </td>
+              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                {chi['Mã CHI'] || '—'}
+              </td>
+              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                {formatDate(chi['Ngày giải ngân'])}
+              </td>
+              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                {formatCurrency(chi['SỐ TIỀN'])}
+              </td>
+              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                {chi['ĐỐI TƯỢNG'] || '—'}
+              </td>
+              <td className="px-4 py-4 whitespace-nowrap text-sm">
+                <span className={`px-2 py-1 rounded-full text-xs font-medium 
+                  ${chi['TRẠNG THÁI'] === 'Hoàn thành' 
+                    ? 'bg-green-100 text-green-800' 
+                    : chi['TRẠNG THÁI'] === 'Đang xử lý' 
+                      ? 'bg-yellow-100 text-yellow-800' 
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                  {chi['TRẠNG THÁI'] || 'Chưa xác định'}
+                </span>
+              </td>
+            </tr>
+          ))}
+        {chiData.filter(chi => chi['Năm'] === filterYear).length === 0 && (
+          <tr>
+            <td colSpan="8" className="px-4 py-6 text-center text-sm text-gray-500">
+              Không có dữ liệu chi tiêu cho năm {filterYear}
+            </td>
+          </tr>
+        )}
+      </tbody>
+    </table>
+  </div>
+</div>
                 </div>
             </div>
 
