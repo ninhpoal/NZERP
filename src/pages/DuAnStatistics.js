@@ -5,6 +5,7 @@ import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import authUtils from '../utils/authUtils';
 import ChartDataLabels from 'chartjs-plugin-datalabels';
+import Select from 'react-select';
 
 // Import Chart.js components
 import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend, ArcElement, PointElement, LineElement } from 'chart.js';
@@ -33,6 +34,7 @@ const DuAnStatistics = () => {
     const [filterStatus, setFilterStatus] = useState('TẤT CẢ');
     const [filterYear, setFilterYear] = useState(new Date().getFullYear());
     const [filterMonth, setFilterMonth] = useState('TẤT CẢ');
+    const [filterMonths, setFilterMonths] = useState(['TẤT CẢ']);
     const [filterBudget, setFilterBudget] = useState('TẤT CẢ');
     const [sortConfig, setSortConfig] = useState({ key: 'Ngày nhận kế hoạch', direction: 'descending' });
     const [showFilters, setShowFilters] = useState(false);
@@ -56,29 +58,31 @@ const DuAnStatistics = () => {
     const chartRef = useRef(null);
     const fetchChiData = async () => {
         try {
-          setLoading(true);
-          const response = await authUtils.apiRequest('CHI', 'Find', {Properties: {
-            Selector: `Filter(CHI, [TRẠNG THÁI] = "Đã giải ngân")`
-        }});
-          
-          // Transform dữ liệu chi
-          const transformedChiData = response.map(chi => ({
-            ...chi,
-            'Ngày giải ngân': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']) : null,
-            'SỐ TIỀN': parseFloat(chi['SỐ TIỀN']) || 0,
-            'Tháng': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']).getMonth() + 1 : null,
-            'Năm': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']).getFullYear() : null
-          }));
-          
-          setChiData(transformedChiData);
-          setLoading(false);
+            setLoading(true);
+            const response = await authUtils.apiRequest('CHI', 'Find', {
+                Properties: {
+                    Selector: `Filter(CHI, [TRẠNG THÁI] = "Đã giải ngân")`
+                }
+            });
+
+            // Transform dữ liệu chi
+            const transformedChiData = response.map(chi => ({
+                ...chi,
+                'Ngày giải ngân': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']) : null,
+                'SỐ TIỀN': parseFloat(chi['SỐ TIỀN']) || 0,
+                'Tháng': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']).getMonth() + 1 : null,
+                'Năm': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']).getFullYear() : null
+            }));
+
+            setChiData(transformedChiData);
+            setLoading(false);
         } catch (error) {
-          console.error('Error fetching chi data:', error);
-          toast.error('Lỗi khi tải dữ liệu chi tiêu');
-          setLoading(false);
+            console.error('Error fetching chi data:', error);
+            toast.error('Lỗi khi tải dữ liệu chi tiêu');
+            setLoading(false);
         }
-      };
-      
+    };
+
     // Fetch data
     const fetchProjects = async () => {
         try {
@@ -113,14 +117,14 @@ const DuAnStatistics = () => {
     useEffect(() => {
         fetchProjects();
         fetchChiData(); // Thêm dòng này
-      }, []);
-      
+    }, []);
+
 
     // Reset pagination when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, filterArea, filterStatus, filterYear, filterMonth, filterBudget]);
-
+    }, [search, filterArea, filterStatus, filterYear, filterMonths, filterBudget, filterCheck]);
+    
     // Sorting function
     const requestSort = (key) => {
         let direction = 'ascending';
@@ -128,27 +132,34 @@ const DuAnStatistics = () => {
             direction = 'descending';
         }
         setSortConfig({ key, direction });
-    };  
+    };
     // Thêm hàm tính toán chi tiêu theo tháng
-const calculateMonthlyExpenses = () => {
-    const monthlyExpenses = Array(12).fill(0);
+    const calculateMonthlyExpenses = () => {
+        const monthlyExpenses = Array(12).fill(0);
     
-    // Lọc chi theo năm được chọn
-    const yearExpenses = chiData.filter(chi => {
-      if (!chi['Ngày giải ngân']) return false;
-      return chi['Năm'] === filterYear;
-    });
+        // Lọc chi theo năm và tháng được chọn
+        chiData.forEach(chi => {
+            if (!chi['Ngày giải ngân']) return;
+            
+            const chiDate = new Date(chi['Ngày giải ngân']);
+            const chiYear = chiDate.getFullYear();
+            const chiMonth = chiDate.getMonth() + 1;
+            
+            // Kiểm tra năm
+            if (chiYear !== filterYear) return;
+            
+            // Kiểm tra tháng (nếu có lọc tháng cụ thể)
+            if (!filterMonths.includes('TẤT CẢ') && 
+                !filterMonths.includes(`Tháng ${chiMonth}`)) {
+                return;
+            }
+            
+            const month = chiMonth - 1; // Chuyển từ 1-12 sang 0-11 để khớp với array index
+            monthlyExpenses[month] += chi['SỐ TIỀN'];
+        });
     
-    // Tính tổng chi tiêu cho từng tháng
-    yearExpenses.forEach(chi => {
-      const month = chi['Tháng'] - 1; // Chuyển từ 1-12 sang 0-11 để khớp với array index
-      if (month >= 0 && month < 12) {
-        monthlyExpenses[month] += chi['SỐ TIỀN'];
-      }
-    });
-    
-    return monthlyExpenses;
-  };
+        return monthlyExpenses;
+    };
     // Get sorted items
     const getSortedItems = useMemo(() => {
         const sortableItems = [...projects];
@@ -270,8 +281,14 @@ const calculateMonthlyExpenses = () => {
                 : null;
 
             const monthNumber = filterMonth === 'TẤT CẢ' ? 0 : parseInt(filterMonth.replace('Tháng ', ''));
-            const matchesMonth = filterMonth === 'TẤT CẢ' || projectMonth === monthNumber;
-
+            // Trong phần filter của filteredItems
+            // Kiểm tra lại hàm filter trong filteredItems
+            // Trong phần định nghĩa filteredItems
+            const matchesMonth = filterMonths.includes('TẤT CẢ') || (project['Ngày nhận kế hoạch'] && filterMonths.some(monthName => {
+                if (monthName === 'TẤT CẢ') return true;
+                const monthNumber = parseInt(monthName.replace('Tháng ', ''));
+                return new Date(project['Ngày nhận kế hoạch']).getMonth() + 1 === monthNumber;
+            }));
             const matchesBudget = projectMatchesBudget(project, filterBudget);
 
             return matchesSearch && matchesArea && matchesStatus && matchesYear && matchesMonth && matchesBudget && matchesCheck;
@@ -287,7 +304,25 @@ const calculateMonthlyExpenses = () => {
         const areaStats = {};
 
         areas.filter(area => area !== 'TẤT CẢ').forEach(area => {
-            const areaProjects = filteredItems.filter(project => project['Khu vực'] === area);
+            // Lọc dự án theo khu vực và tháng được chọn
+            const areaProjects = filteredItems.filter(project => {
+                if (project['Khu vực'] !== area) return false;
+
+                // Nếu không có ngày nhận kế hoạch, vẫn giữ lại dự án
+                if (!project['Ngày nhận kế hoạch']) return true;
+
+                // Lọc theo tháng nếu có chọn tháng cụ thể
+                if (!filterMonths.includes('TẤT CẢ')) {
+                    const projectMonth = new Date(project['Ngày nhận kế hoạch']).getMonth() + 1;
+                    const monthMatches = filterMonths.some(monthStr => {
+                        const monthNum = parseInt(monthStr.replace('Tháng ', ''));
+                        return projectMonth === monthNum;
+                    });
+                    return monthMatches;
+                }
+
+                return true;
+            });
 
             areaStats[area] = {
                 projectCount: areaProjects.length,
@@ -323,22 +358,26 @@ const calculateMonthlyExpenses = () => {
 
         for (let month = 1; month <= 12; month++) {
             const monthName = `Tháng ${month}`;
-            const monthProjects = filteredItems.filter(project => {
-                if (!project['Ngày nhận kế hoạch']) return false;
-                const projectDate = new Date(project['Ngày nhận kế hoạch']);
-                return projectDate.getMonth() + 1 === month && projectDate.getFullYear() === filterYear;
-            });
+            // Chỉ tính cho các tháng được chọn hoặc tất cả tháng nếu chọn "TẤT CẢ"
+            if (filterMonths.includes('TẤT CẢ') || filterMonths.includes(monthName)) {
+                const monthProjects = filteredItems.filter(project => {
+                    if (!project['Ngày nhận kế hoạch']) return false;
+                    const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                    return projectDate.getMonth() + 1 === month && projectDate.getFullYear() === filterYear;
+                });
 
-            monthlyStats[monthName] = {
-                projectCount: monthProjects.length,
-                estimatedRevenue: monthProjects.reduce((sum, project) => sum + (project['Doanh thu tạm tính'] || 0), 0),
-                actualRevenue: monthProjects.reduce((sum, project) => sum + (project['Số tiền HSHC Trước thuế'] || 0), 0),
-                derivedRevenue: monthProjects.reduce((sum, project) => sum + (project['Doanh thu nội suy'] || 0), 0),
-            };
+                monthlyStats[monthName] = {
+                    projectCount: monthProjects.length,
+                    estimatedRevenue: monthProjects.reduce((sum, project) => sum + (project['Doanh thu tạm tính'] || 0), 0),
+                    actualRevenue: monthProjects.reduce((sum, project) => sum + (project['Số tiền HSHC Trước thuế'] || 0), 0),
+                    derivedRevenue: monthProjects.reduce((sum, project) => sum + (project['Doanh thu nội suy'] || 0), 0),
+                };
+            }
         }
 
         return monthlyStats;
     };
+    const monthOptions = months.map(month => ({ value: month, label: month }));
     // Prepare monthly data for charts
     const prepareMonthlyData = () => {
         // Initialize array with all months
@@ -362,7 +401,11 @@ const calculateMonthlyExpenses = () => {
             if (!project['Ngày nhận kế hoạch']) return false;
 
             const projectDate = new Date(project['Ngày nhận kế hoạch']);
-            return projectDate.getFullYear() === filterYear;
+            const projectMonth = projectDate.getMonth() + 1;
+
+            return projectDate.getFullYear() === filterYear &&
+                (filterMonths.includes('TẤT CẢ') ||
+                    filterMonths.some(month => parseInt(month.replace('Tháng ', '')) === projectMonth));
         });
 
         // Process projects for each month
@@ -501,525 +544,547 @@ const calculateMonthlyExpenses = () => {
 
         return monthlyAverages;
     };
-// Thêm hàm để tính toán thống kê chi tiêu theo tháng
-const calculateMonthlyChiStatistics = () => {
-    const monthlyStats = {};
-  
-    for (let month = 1; month <= 12; month++) {
-      const monthName = `Tháng ${month}`;
-      const monthChiData = chiData.filter(chi => {
-        if (!chi['Ngày giải ngân']) return false;
-        const chiDate = new Date(chi['Ngày giải ngân']);
-        return chiDate.getMonth() + 1 === month && chiDate.getFullYear() === filterYear;
-      });
-  
-      monthlyStats[monthName] = {
-        chiCount: monthChiData.length,
-        totalAmount: monthChiData.reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0)
-      };
-    }
-  
-    return monthlyStats;
-  };
-  const calculateTotalExpenses = () => {
-    return chiData
-      .filter(chi => {
-        if (!chi['Ngày giải ngân']) return false;
-        return new Date(chi['Ngày giải ngân']).getFullYear() === filterYear;
-      })
-      .reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0);
-  };
-    // Modify the getChartConfig function to include all revenue types
-// Modify the getChartConfig function to include all revenue types and expenses
-const getChartConfig = () => {
-    const labels = months.slice(1).map(month => month);
-    const monthlyExpenses = calculateMonthlyExpenses();
-
-    // Common options for all chart types
-    const commonOptions = {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-            legend: {
-                position: 'top',
-            },
-            tooltip: {
-                callbacks: {
-                    label: function (context) {
-                        let label = context.dataset.label || '';
-                        if (label) {
-                            label += ': ';
-                        }
-                        if (context.dataset.label.includes('Doanh thu') || context.dataset.label.includes('Chi tiêu')) {
-                            label += formatCurrency(context.parsed.y);
-                        } else {
-                            label += context.parsed.y;
-                        }
-                        return label;
-                    }
+    // Thêm hàm để tính toán thống kê chi tiêu theo tháng
+    const calculateMonthlyChiStatistics = () => {
+        const monthlyStats = {};
+    
+        for (let month = 1; month <= 12; month++) {
+            const monthName = `Tháng ${month}`;
+            // Chỉ tính cho các tháng được chọn hoặc tất cả tháng nếu chọn "TẤT CẢ"
+            if (filterMonths.includes('TẤT CẢ') || filterMonths.includes(monthName)) {
+                const monthChiData = chiData.filter(chi => {
+                    if (!chi['Ngày giải ngân']) return false;
+                    const chiDate = new Date(chi['Ngày giải ngân']);
+                    return chiDate.getMonth() + 1 === month && chiDate.getFullYear() === filterYear;
+                });
+    
+                monthlyStats[monthName] = {
+                    chiCount: monthChiData.length,
+                    totalAmount: monthChiData.reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0)
+                };
+            }
+        }
+    
+        return monthlyStats;
+    };
+    const calculateTotalExpenses = () => {
+        return chiData
+            .filter(chi => {
+                if (!chi['Ngày giải ngân']) return false;
+                
+                const chiDate = new Date(chi['Ngày giải ngân']);
+                const chiYear = chiDate.getFullYear();
+                const chiMonth = chiDate.getMonth() + 1;
+                
+                // Lọc theo năm
+                if (chiYear !== filterYear) return false;
+                
+                // Lọc theo tháng nếu không phải "TẤT CẢ"
+                if (!filterMonths.includes('TẤT CẢ')) {
+                    return filterMonths.some(monthName => {
+                        if (monthName === 'TẤT CẢ') return true;
+                        const monthNumber = parseInt(monthName.replace('Tháng ', ''));
+                        return chiMonth === monthNumber;
+                    });
                 }
-            },
-            datalabels: {
-                align: 'center',
-                anchor: 'end',
-                formatter: function (value, context) {
-                    if (context.dataset.label.includes('Doanh thu') || context.dataset.label.includes('Chi tiêu')) {
-                        // Hiển thị doanh thu theo đơn vị triệu hoặc tỷ để gọn hơn
-                        if (value >= 1000000000) {
-                            return (value / 1000000000).toFixed(1) + ' tỷ';
-                        } else if (value >= 1000000) {
-                            return (value / 1000000).toFixed(0) + 'tr';
+                
+                return true;
+            })
+            .reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0);
+    };
+    // Modify the getChartConfig function to include all revenue types
+    // Modify the getChartConfig function to include all revenue types and expenses
+    const getChartConfig = () => {
+        const labels = months.slice(1).map(month => month);
+        const monthlyExpenses = calculateMonthlyExpenses();
+
+        // Common options for all chart types
+        const commonOptions = {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: {
+                    position: 'top',
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function (context) {
+                            let label = context.dataset.label || '';
+                            if (label) {
+                                label += ': ';
+                            }
+                            if (context.dataset.label.includes('Doanh thu') || context.dataset.label.includes('Chi tiêu')) {
+                                label += formatCurrency(context.parsed.y);
+                            } else {
+                                label += context.parsed.y;
+                            }
+                            return label;
+                        }
+                    }
+                },
+                datalabels: {
+                    align: 'center',
+                    anchor: 'end',
+                    formatter: function (value, context) {
+                        if (context.dataset.label.includes('Doanh thu') || context.dataset.label.includes('Chi tiêu')) {
+                            // Hiển thị doanh thu theo đơn vị triệu hoặc tỷ để gọn hơn
+                            if (value >= 1000000000) {
+                                return (value / 1000000000).toFixed(1) + ' tỷ';
+                            } else if (value >= 1000000) {
+                                return (value / 1000000).toFixed(0) + 'tr';
+                            } else {
+                                return value;
+                            }
                         } else {
                             return value;
                         }
-                    } else {
-                        return value;
+                    },
+                    color: function (context) {
+                        return context.dataset.backgroundColor;
+                    },
+                    font: {
+                        weight: 'bold',
+                        size: 12,
+                    },
+                    offset: 0,
+                    padding: 0
+                }
+            },
+        };
+
+        switch (chartType) {
+            case 'monthly': {
+                const monthlyData = prepareMonthlyData();
+                return {
+                    type: 'bar',
+                    data: {
+                        labels: monthlyData.map(item => item.monthName),
+                        datasets: [
+                            {
+                                type: 'bar',
+                                label: 'Tổng dự án',
+                                data: monthlyData.map(item => item.projectCount),
+                                backgroundColor: '#4F46E5',
+                                yAxisID: 'y',
+                                datalabels: {
+                                    color: '#4F46E5',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'bar',
+                                label: 'Doanh thu HSHC',
+                                data: monthlyData.map(item => item.totalRevenue),
+                                backgroundColor: '#EC4899',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#EC4899',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'bar',
+                                label: 'Doanh thu tạm tính',
+                                data: monthlyData.map(item => {
+                                    const monthProjects = filteredItems.filter(project => {
+                                        if (!project['Ngày nhận kế hoạch']) return false;
+                                        const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                                        const projectMonth = projectDate.getMonth() + 1;
+                                        return projectMonth === item.month &&
+                                            projectDate.getFullYear() === filterYear &&
+                                            (filterMonths.includes('TẤT CẢ') ||
+                                                filterMonths.includes(`Tháng ${projectMonth}`));
+                                    });
+                                    return monthProjects.reduce((sum, project) =>
+                                        sum + (project['Doanh thu tạm tính'] || 0), 0);
+                                }),
+                                backgroundColor: '#10B981',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#10B981',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'bar',
+                                label: 'Doanh thu nội suy',
+                                data: monthlyData.map(item => {
+                                    const monthProjects = filteredItems.filter(project => {
+                                        if (!project['Ngày nhận kế hoạch']) return false;
+                                        const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                                        const projectMonth = projectDate.getMonth() + 1;
+                                        return projectMonth === item.month &&
+                                            projectDate.getFullYear() === filterYear &&
+                                            (filterMonths.includes('TẤT CẢ') ||
+                                                filterMonths.includes(`Tháng ${projectMonth}`));
+                                    });
+                                    return monthProjects.reduce((sum, project) =>
+                                        sum + (project['Doanh thu nội suy'] || 0), 0);
+                                }),
+                                backgroundColor: '#8B5CF6',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#8B5CF6',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'bar',
+                                label: 'Chi tiêu',
+                                data: monthlyExpenses,
+                                borderColor: '#F59E0B',
+                                backgroundColor: '#F59E0B',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#F59E0B',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            }
+                        ]
+                    },
+                    options: {
+                        ...commonOptions,
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: 'Số lượng'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {
+                                    display: true,
+                                    text: 'Doanh thu/Chi tiêu (VNĐ)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            ...commonOptions.plugins,
+                            title: {
+                                display: true,
+                                text: `Thống kê dự án theo tháng (Năm ${filterYear})`,
+                                font: {
+                                    size: 16
+                                }
+                            }
+                        }
                     }
-                },
-                color: function (context) {
-                    return context.dataset.backgroundColor;
-                },
-                font: {
-                    weight: 'bold',
-                    size: 12,
-                },
-                offset: 0,
-                padding: 0
+                };
             }
-        },
+
+            case 'cumulative': {
+                const cumulativeData = prepareCumulativeData();
+
+                // Calculate cumulative values for estimated and derived revenue
+                const cumulativeEstimatedRevenue = [];
+                const cumulativeDerivedRevenue = [];
+                const cumulativeExpenses = [];
+
+                let runningEstimated = 0;
+                let runningDerived = 0;
+                let runningExpenses = 0;
+
+                for (let month = 1; month <= 12; month++) {
+                    // Filter projects for this month and earlier in the selected year
+                    const monthProjects = filteredItems.filter(project => {
+                        if (!project['Ngày nhận kế hoạch']) return false;
+                        const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                        return projectDate.getMonth() + 1 <= month &&
+                            projectDate.getFullYear() === filterYear;
+                    });
+
+                    // Calculate cumulative revenues
+                    runningEstimated = monthProjects.reduce((sum, project) =>
+                        sum + (project['Doanh thu tạm tính'] || 0), 0);
+
+                    runningDerived = monthProjects.reduce((sum, project) =>
+                        sum + (project['Doanh thu nội suy'] || 0), 0);
+
+                    // Calculate cumulative expenses
+                    const monthExpenses = chiData.filter(chi => {
+                        if (!chi['Ngày giải ngân']) return false;
+                        const chiDate = new Date(chi['Ngày giải ngân']);
+                        return chiDate.getMonth() + 1 <= month &&
+                            chiDate.getFullYear() === filterYear;
+                    });
+
+                    runningExpenses = monthExpenses.reduce((sum, chi) =>
+                        sum + (chi['SỐ TIỀN'] || 0), 0);
+
+                    cumulativeEstimatedRevenue.push(runningEstimated);
+                    cumulativeDerivedRevenue.push(runningDerived);
+                    cumulativeExpenses.push(runningExpenses);
+                }
+
+                return {
+                    type: 'bar',
+                    data: {
+                        labels: cumulativeData.map(item => item.monthName),
+                        datasets: [
+                            {
+                                type: 'bar',
+                                label: 'Dự án tích lũy',
+                                data: cumulativeData.map(item => item.projectCount),
+                                backgroundColor: '#4F46E5',
+                                yAxisID: 'y',
+                                datalabels: {
+                                    color: '#4F46E5',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'bar',
+                                label: 'Doanh thu HSHC tích lũy',
+                                data: cumulativeData.map(item => item.totalRevenue),
+                                backgroundColor: '#EC4899',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#EC4899',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'bar',
+                                label: 'Doanh thu tạm tính tích lũy',
+                                data: cumulativeEstimatedRevenue,
+                                backgroundColor: '#10B981',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#10B981',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'bar',
+                                label: 'Doanh thu nội suy tích lũy',
+                                data: cumulativeDerivedRevenue,
+                                backgroundColor: '#8B5CF6',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#8B5CF6',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'line',
+                                label: 'Chi tiêu tích lũy',
+                                data: cumulativeExpenses,
+                                borderColor: '#F59E0B',
+                                backgroundColor: '#F59E0B',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#F59E0B',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            }
+                        ]
+                    },
+                    options: {
+                        ...commonOptions,
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: 'Số lượng'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {
+                                    display: true,
+                                    text: 'Doanh thu/Chi tiêu (VNĐ)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            ...commonOptions.plugins,
+                            title: {
+                                display: true,
+                                text: `Số liệu tích lũy theo thời gian (Năm ${filterYear})`,
+                                font: {
+                                    size: 16
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+
+            case 'average': {
+                const averageData = prepareMonthlyAverages();
+                const monthlyExpenses = calculateMonthlyExpenses();
+
+                // Calculate monthly data for estimated and derived revenue
+                const currentYearEstimatedRevenue = [];
+                const currentYearDerivedRevenue = [];
+
+                for (let month = 1; month <= 12; month++) {
+                    // Filter projects for this month in the selected year
+                    const monthProjects = filteredItems.filter(project => {
+                        if (!project['Ngày nhận kế hoạch']) return false;
+                        const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                        return projectDate.getMonth() + 1 === month &&
+                            projectDate.getFullYear() === filterYear;
+                    });
+
+                    // Calculate revenues
+                    const estimatedRevenue = monthProjects.reduce((sum, project) =>
+                        sum + (project['Doanh thu tạm tính'] || 0), 0);
+
+                    const derivedRevenue = monthProjects.reduce((sum, project) =>
+                        sum + (project['Doanh thu nội suy'] || 0), 0);
+
+                    currentYearEstimatedRevenue.push(estimatedRevenue);
+                    currentYearDerivedRevenue.push(derivedRevenue);
+                }
+
+                return {
+                    type: 'bar',
+                    data: {
+                        labels: averageData.map(item => item.monthName),
+                        datasets: [
+                            {
+                                type: 'bar',
+                                label: `Số dự án ${filterYear}`,
+                                data: averageData.map(item => item.currentYearCount),
+                                backgroundColor: '#4F46E5',
+                                yAxisID: 'y',
+                                datalabels: {
+                                    color: '#4F46E5',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'bar',
+                                label: `Doanh thu HSHC ${filterYear}`,
+                                data: averageData.map(item => item.currentYearRevenue),
+                                backgroundColor: '#EC4899',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#EC4899',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'bar',
+                                label: `Doanh thu tạm tính ${filterYear}`,
+                                data: currentYearEstimatedRevenue,
+                                backgroundColor: '#10B981',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#10B981',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'bar',
+                                label: `Doanh thu nội suy ${filterYear}`,
+                                data: currentYearDerivedRevenue,
+                                backgroundColor: '#8B5CF6',
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#8B5CF6',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            },
+                            {
+                                type: 'line',
+                                label: `Chi tiêu ${filterYear}`,
+                                data: monthlyExpenses,
+                                borderColor: '#F59E0B',
+                                backgroundColor: '#F59E0B',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.4,
+                                yAxisID: 'y1',
+                                datalabels: {
+                                    color: '#F59E0B',
+                                    anchor: 'end',
+                                    align: 'top'
+                                }
+                            }
+                        ]
+                    },
+                    options: {
+                        ...commonOptions,
+                        scales: {
+                            y: {
+                                type: 'linear',
+                                display: true,
+                                position: 'left',
+                                title: {
+                                    display: true,
+                                    text: 'Số dự án'
+                                }
+                            },
+                            y1: {
+                                type: 'linear',
+                                display: true,
+                                position: 'right',
+                                title: {
+                                    display: true,
+                                    text: 'Doanh thu/Chi tiêu (VNĐ)'
+                                },
+                                grid: {
+                                    drawOnChartArea: false
+                                }
+                            }
+                        },
+                        plugins: {
+                            ...commonOptions.plugins,
+                            title: {
+                                display: true,
+                                text: `So sánh với trung bình các năm (${filterYear})`,
+                                font: {
+                                    size: 16
+                                }
+                            }
+                        }
+                    }
+                };
+            }
+
+            default:
+                return null;
+        }
     };
-
-    switch (chartType) {
-        case 'monthly': {
-            const monthlyData = prepareMonthlyData();
-            return {
-                type: 'bar',
-                data: {
-                    labels: monthlyData.map(item => item.monthName),
-                    datasets: [
-                        {
-                            type: 'bar',
-                            label: 'Tổng dự án',
-                            data: monthlyData.map(item => item.projectCount),
-                            backgroundColor: '#4F46E5',
-                            yAxisID: 'y',
-                            datalabels: {
-                                color: '#4F46E5',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'bar',
-                            label: 'Doanh thu HSHC',
-                            data: monthlyData.map(item => item.totalRevenue),
-                            backgroundColor: '#EC4899',
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#EC4899',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'bar',
-                            label: 'Doanh thu tạm tính',
-                            data: monthlyData.map(item => {
-                                // Filter projects for this month
-                                const monthProjects = filteredItems.filter(project => {
-                                    if (!project['Ngày nhận kế hoạch']) return false;
-                                    const projectDate = new Date(project['Ngày nhận kế hoạch']);
-                                    return projectDate.getMonth() + 1 === item.month && 
-                                           projectDate.getFullYear() === filterYear;
-                                });
-                                // Sum the estimated revenue
-                                return monthProjects.reduce((sum, project) => 
-                                    sum + (project['Doanh thu tạm tính'] || 0), 0);
-                            }),
-                            backgroundColor: '#10B981',
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#10B981',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'bar',
-                            label: 'Doanh thu nội suy',
-                            data: monthlyData.map(item => {
-                                // Filter projects for this month
-                                const monthProjects = filteredItems.filter(project => {
-                                    if (!project['Ngày nhận kế hoạch']) return false;
-                                    const projectDate = new Date(project['Ngày nhận kế hoạch']);
-                                    return projectDate.getMonth() + 1 === item.month && 
-                                           projectDate.getFullYear() === filterYear;
-                                });
-                                // Sum the derived revenue
-                                return monthProjects.reduce((sum, project) => 
-                                    sum + (project['Doanh thu nội suy'] || 0), 0);
-                            }),
-                            backgroundColor: '#8B5CF6',
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#8B5CF6',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'line',
-                            label: 'Chi tiêu',
-                            data: monthlyExpenses,
-                            borderColor: '#F59E0B',
-                            backgroundColor: '#F59E0B',
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.4,
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#F59E0B',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        }
-                    ]
-                },
-                options: {
-                    ...commonOptions,
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {
-                                display: true,
-                                text: 'Số lượng'
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {
-                                display: true,
-                                text: 'Doanh thu/Chi tiêu (VNĐ)'
-                            },
-                            grid: {
-                                drawOnChartArea: false
-                            }
-                        }
-                    },
-                    plugins: {
-                        ...commonOptions.plugins,
-                        title: {
-                            display: true,
-                            text: `Thống kê dự án theo tháng (Năm ${filterYear})`,
-                            font: {
-                                size: 16
-                            }
-                        }
-                    }
-                }
-            };
-        }
-
-        case 'cumulative': {
-            const cumulativeData = prepareCumulativeData();
-            
-            // Calculate cumulative values for estimated and derived revenue
-            const cumulativeEstimatedRevenue = [];
-            const cumulativeDerivedRevenue = [];
-            const cumulativeExpenses = [];
-            
-            let runningEstimated = 0;
-            let runningDerived = 0;
-            let runningExpenses = 0;
-            
-            for (let month = 1; month <= 12; month++) {
-                // Filter projects for this month and earlier in the selected year
-                const monthProjects = filteredItems.filter(project => {
-                    if (!project['Ngày nhận kế hoạch']) return false;
-                    const projectDate = new Date(project['Ngày nhận kế hoạch']);
-                    return projectDate.getMonth() + 1 <= month && 
-                           projectDate.getFullYear() === filterYear;
-                });
-                
-                // Calculate cumulative revenues
-                runningEstimated = monthProjects.reduce((sum, project) => 
-                    sum + (project['Doanh thu tạm tính'] || 0), 0);
-                    
-                runningDerived = monthProjects.reduce((sum, project) => 
-                    sum + (project['Doanh thu nội suy'] || 0), 0);
-                
-                // Calculate cumulative expenses
-                const monthExpenses = chiData.filter(chi => {
-                    if (!chi['Ngày giải ngân']) return false;
-                    const chiDate = new Date(chi['Ngày giải ngân']);
-                    return chiDate.getMonth() + 1 <= month && 
-                           chiDate.getFullYear() === filterYear;
-                });
-                
-                runningExpenses = monthExpenses.reduce((sum, chi) => 
-                    sum + (chi['SỐ TIỀN'] || 0), 0);
-                    
-                cumulativeEstimatedRevenue.push(runningEstimated);
-                cumulativeDerivedRevenue.push(runningDerived);
-                cumulativeExpenses.push(runningExpenses);
-            }
-            
-            return {
-                type: 'bar',
-                data: {
-                    labels: cumulativeData.map(item => item.monthName),
-                    datasets: [
-                        {
-                            type: 'bar',
-                            label: 'Dự án tích lũy',
-                            data: cumulativeData.map(item => item.projectCount),
-                            backgroundColor: '#4F46E5',
-                            yAxisID: 'y',
-                            datalabels: {
-                                color: '#4F46E5',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'bar',
-                            label: 'Doanh thu HSHC tích lũy',
-                            data: cumulativeData.map(item => item.totalRevenue),
-                            backgroundColor: '#EC4899',
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#EC4899',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'bar',
-                            label: 'Doanh thu tạm tính tích lũy',
-                            data: cumulativeEstimatedRevenue,
-                            backgroundColor: '#10B981',
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#10B981',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'bar',
-                            label: 'Doanh thu nội suy tích lũy',
-                            data: cumulativeDerivedRevenue,
-                            backgroundColor: '#8B5CF6',
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#8B5CF6',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'line',
-                            label: 'Chi tiêu tích lũy',
-                            data: cumulativeExpenses,
-                            borderColor: '#F59E0B',
-                            backgroundColor: '#F59E0B',
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.4,
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#F59E0B',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        }
-                    ]
-                },
-                options: {
-                    ...commonOptions,
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {
-                                display: true,
-                                text: 'Số lượng'
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {
-                                display: true,
-                                text: 'Doanh thu/Chi tiêu (VNĐ)'
-                            },
-                            grid: {
-                                drawOnChartArea: false
-                            }
-                        }
-                    },
-                    plugins: {
-                        ...commonOptions.plugins,
-                        title: {
-                            display: true,
-                            text: `Số liệu tích lũy theo thời gian (Năm ${filterYear})`,
-                            font: {
-                                size: 16
-                            }
-                        }
-                    }
-                }
-            };
-        }
-
-        case 'average': {
-            const averageData = prepareMonthlyAverages();
-            const monthlyExpenses = calculateMonthlyExpenses();
-            
-            // Calculate monthly data for estimated and derived revenue
-            const currentYearEstimatedRevenue = [];
-            const currentYearDerivedRevenue = [];
-            
-            for (let month = 1; month <= 12; month++) {
-                // Filter projects for this month in the selected year
-                const monthProjects = filteredItems.filter(project => {
-                    if (!project['Ngày nhận kế hoạch']) return false;
-                    const projectDate = new Date(project['Ngày nhận kế hoạch']);
-                    return projectDate.getMonth() + 1 === month && 
-                           projectDate.getFullYear() === filterYear;
-                });
-                
-                // Calculate revenues
-                const estimatedRevenue = monthProjects.reduce((sum, project) => 
-                    sum + (project['Doanh thu tạm tính'] || 0), 0);
-                    
-                const derivedRevenue = monthProjects.reduce((sum, project) => 
-                    sum + (project['Doanh thu nội suy'] || 0), 0);
-                    
-                currentYearEstimatedRevenue.push(estimatedRevenue);
-                currentYearDerivedRevenue.push(derivedRevenue);
-            }
-            
-            return {
-                type: 'bar',
-                data: {
-                    labels: averageData.map(item => item.monthName),
-                    datasets: [
-                        {
-                            type: 'bar',
-                            label: `Số dự án ${filterYear}`,
-                            data: averageData.map(item => item.currentYearCount),
-                            backgroundColor: '#4F46E5',
-                            yAxisID: 'y',
-                            datalabels: {
-                                color: '#4F46E5',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'bar',
-                            label: `Doanh thu HSHC ${filterYear}`,
-                            data: averageData.map(item => item.currentYearRevenue),
-                            backgroundColor: '#EC4899',
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#EC4899',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'bar',
-                            label: `Doanh thu tạm tính ${filterYear}`,
-                            data: currentYearEstimatedRevenue,
-                            backgroundColor: '#10B981',
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#10B981',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'bar',
-                            label: `Doanh thu nội suy ${filterYear}`,
-                            data: currentYearDerivedRevenue,
-                            backgroundColor: '#8B5CF6',
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#8B5CF6',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        },
-                        {
-                            type: 'line',
-                            label: `Chi tiêu ${filterYear}`,
-                            data: monthlyExpenses,
-                            borderColor: '#F59E0B',
-                            backgroundColor: '#F59E0B',
-                            borderWidth: 2,
-                            fill: false,
-                            tension: 0.4,
-                            yAxisID: 'y1',
-                            datalabels: {
-                                color: '#F59E0B',
-                                anchor: 'end',
-                                align: 'top'
-                            }
-                        }
-                    ]
-                },
-                options: {
-                    ...commonOptions,
-                    scales: {
-                        y: {
-                            type: 'linear',
-                            display: true,
-                            position: 'left',
-                            title: {
-                                display: true,
-                                text: 'Số dự án'
-                            }
-                        },
-                        y1: {
-                            type: 'linear',
-                            display: true,
-                            position: 'right',
-                            title: {
-                                display: true,
-                                text: 'Doanh thu/Chi tiêu (VNĐ)'
-                            },
-                            grid: {
-                                drawOnChartArea: false
-                            }
-                        }
-                    },
-                    plugins: {
-                        ...commonOptions.plugins,
-                        title: {
-                            display: true,
-                            text: `So sánh với trung bình các năm (${filterYear})`,
-                            font: {
-                                size: 16
-                            }
-                        }
-                    }
-                }
-            };
-        }
-
-        default:
-            return null;
-    }
-};
 
     // Calculate summary statistics
     const statistics = useMemo(() => {
@@ -1412,18 +1477,21 @@ const getChartConfig = () => {
                                     {/* Month filter */}
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Tháng:</h3>
-                                        <div className="relative">
-                                            <select
-                                                value={filterMonth}
-                                                onChange={(e) => setFilterMonth(e.target.value)}
-                                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 appearance-none pr-10"
-                                            >
-                                                {months.map((month, index) => (
-                                                    <option key={index} value={month}>{month}</option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
-                                        </div>
+                                        <Select
+                                            isMulti
+                                            options={monthOptions}
+                                            value={monthOptions.filter(option => filterMonths.includes(option.value))}
+                                            onChange={(selectedOptions) => {
+                                                if (selectedOptions.length === 0) {
+                                                    setFilterMonths(['TẤT CẢ']);
+                                                } else {
+                                                    setFilterMonths(selectedOptions.map(option => option.value));
+                                                }
+                                            }}
+                                            placeholder="Chọn tháng..."
+                                            className="basic-multi-select"
+                                            classNamePrefix="select"
+                                        />
                                     </div>
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Đánh giá:</h3>
@@ -1485,42 +1553,57 @@ const getChartConfig = () => {
                             <p className="text-2xl font-bold text-blue-800">{statistics.totalProjects}</p>
                             <p className="text-xs text-blue-600 mt-1">Trung bình {statistics.avgMonthlyProjects.toFixed(1)} dự án/tháng</p>
                         </div>
-
-                        <div className="bg-green-50 border border-green-100 rounded-lg p-4">
-                            <h3 className="text-sm text-green-700 mb-1">Hoàn thành</h3>
-                            <p className="text-2xl font-bold text-green-800">{statistics.completedProjects}</p>
-                            <p className="text-xs text-green-600 mt-1">
-                                {statistics.totalProjects > 0
-                                    ? `${(statistics.completedProjects / statistics.totalProjects * 100).toFixed(1)}% tổng số dự án`
-                                    : '0% tổng số dự án'}
-                            </p>
-                        </div>
-
-                        <div className="bg-orange-50 border border-orange-100 rounded-lg p-4">
-                            <h3 className="text-sm text-orange-700 mb-1">Đang thực hiện</h3>
-                            <p className="text-2xl font-bold text-orange-800">{statistics.inProgressProjects}</p>
-                            <p className="text-xs text-orange-600 mt-1">
-                                Thời gian hoàn thành TB: {statistics.avgCompletionTime.toFixed(1)} ngày
-                            </p>
-                        </div>
-
-                        <div className="bg-purple-50 border border-purple-100 rounded-lg p-4">
-                            <h3 className="text-sm text-purple-700 mb-1">Tổng doanh thu HSHC</h3>
-                            <p className="text-xl font-bold text-purple-800">{formatCurrency(statistics.totalRevenue)}</p>
-                            <p className="text-xs text-purple-600 mt-1">
+                        <div className="bg-[#ffe4f1a8] border border-[#f0c8dc] rounded-lg p-4">
+                            <h3 className="text-sm text-[#ec4899] mb-1">Tổng doanh thu HSHC</h3>
+                            <p className="text-xl font-bold text-[#ec4899]">{formatCurrency(statistics.totalRevenue)}</p>
+                            <p className="text-xs text-[#ec4899] mt-1">
                                 TB: {formatCurrency(statistics.avgRevenuePerProject)}/dự án
                             </p>
+                            <p className="text-xs text-red-600 mt-1">
+                                Chênh lệch vs nội suy: {formatCurrency(statistics.totalRevenue - statistics.totalDerivedRevenue)}
+                                ({(statistics.totalRevenue > 0
+                                    ? ((statistics.totalRevenue - statistics.totalDerivedRevenue) / statistics.totalRevenue * 100).toFixed(1)
+                                    : 0)}%)
+                            </p>
                         </div>
-                        {/* Thêm vào phần Statistics cards */}
-<div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
-  <h3 className="text-sm text-amber-700 mb-1">Tổng chi tiêu</h3>
-  <p className="text-xl font-bold text-amber-800">{formatCurrency(calculateTotalExpenses())}</p>
-  <p className="text-xs text-amber-600 mt-1">
-    {chiData.filter(chi => chi['Năm'] === filterYear).length} phiếu chi
-  </p>
-</div>
-                    </div>
 
+
+                        <div className="bg-green-50 border border-green-100 rounded-lg p-4">
+                            <h3 className="text-sm text-green-700 mb-1">Tổng doanh thu tạm tính</h3>
+                            <p className="text-xl font-bold text-green-800">{formatCurrency(statistics.totalEstimatedRevenue)}</p>
+                            <p className="text-xs text-green-600 mt-1">
+                                TB: {formatCurrency(statistics.totalEstimatedRevenue / (statistics.totalProjects || 1))}/dự án
+                            </p>
+                            <p className="text-xs text-red-600 mt-1">
+                                Chênh lệch vs HSHC: {formatCurrency(statistics.totalRevenue - statistics.totalEstimatedRevenue)}
+                                ({(statistics.totalRevenue > 0
+                                    ? ((statistics.totalRevenue - statistics.totalEstimatedRevenue) / statistics.totalRevenue * 100).toFixed(1)
+                                    : 0)}%)
+                            </p>
+                        </div>
+                        <div className="bg-[#dbcefa] border border-[#dbccfc] rounded-lg p-4">
+                            <h3 className="text-sm text-[#7b49f1] mb-1">Tổng doanh thu nội suy</h3>
+                            <p className="text-xl font-bold text-[#804ff1]">{formatCurrency(statistics.totalDerivedRevenue)}</p>
+                            <p className="text-xs text-[#8b5cf6] mt-1">
+                                TB: {formatCurrency(statistics.totalDerivedRevenue / (statistics.totalProjects || 1))}/dự án
+                            </p>
+                            <p className="text-xs text-[#8b5cf6] mt-1">
+                                Chênh lệch vs HSHC: {formatCurrency(statistics.totalRevenue - statistics.totalDerivedRevenue)}
+                                ({(statistics.totalRevenue > 0
+                                    ? ((statistics.totalRevenue - statistics.totalDerivedRevenue) / statistics.totalRevenue * 100).toFixed(1)
+                                    : 0)}%)
+                            </p>
+                        </div>
+
+                        {/* Thêm vào phần Statistics cards */}
+                        <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
+                            <h3 className="text-sm text-amber-700 mb-1">Tổng chi tiêu</h3>
+                            <p className="text-xl font-bold text-amber-800">{formatCurrency(calculateTotalExpenses())}</p>
+                            <p className="text-xs text-amber-600 mt-1">
+                                {chiData.filter(chi => chi['Năm'] === filterYear).length} phiếu chi
+                            </p>
+                        </div>
+                    </div>
                     {/* Charts Section */}
                     <div className="mb-8">
                         <div className="flex justify-between items-center mb-4">
@@ -1567,7 +1650,7 @@ const getChartConfig = () => {
                             </div>
                         </div>
                     </div>
-                  
+
                     {/* Bảng thống kê theo khu vực */}
                     <div className="mb-8">
                         <h2 className="text-lg font-semibold text-gray-800 mb-4">Thống kê theo khu vực</h2>
@@ -1648,6 +1731,7 @@ const getChartConfig = () => {
                         </div>
                     </div>
                     {/* Table Section */}
+                    {/* Table Section */}
                     <div>
                         <h2 className="text-lg font-semibold text-gray-800 mb-4">Danh sách dự án</h2>
                         <div className="overflow-x-auto">
@@ -1709,12 +1793,17 @@ const getChartConfig = () => {
                                             onClick={() => requestSort('Doanh thu nội suy')}>
                                             DT nội suy {getSortIcon('Doanh thu nội suy')}
                                         </th>
+                                        <th scope="col"
+                                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
+                                            onClick={() => requestSort('ChenhLech')}>
+                                            Chênh lệch HSHC-NS {getSortIcon('ChenhLech')}
+                                        </th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {loading ? (
                                         <tr>
-                                            <td colSpan="7" className="px-4 py-4 text-center">
+                                            <td colSpan="12" className="px-4 py-4 text-center">
                                                 <div className="flex items-center justify-center">
                                                     <svg className="animate-spin h-6 w-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -1725,64 +1814,77 @@ const getChartConfig = () => {
                                             </td>
                                         </tr>
                                     ) : currentItems.length > 0 ? (
-                                        currentItems.map((project, index) => (
-                                            <tr key={index} className="hover:bg-gray-50 transition-colors">
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                    {project['Mã kế hoạch']}
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {project['POP'] || '—'}
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {project['Khu vực'] || '—'}
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {formatDate(project['Ngày nhận kế hoạch'])}
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {formatCurrency(project['Số tiền HSHC Trước thuế'])}
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {formatCurrency(project['Doanh thu tạm tính'])}
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium 
-                                                    ${project['Trạng thái'] === 'Hoàn thành'
-                                                            ? 'bg-green-100 text-green-800'
-                                                            : project['Trạng thái'] === 'Đang thực hiện'
-                                                                ? 'bg-blue-100 text-blue-800'
-                                                                : 'bg-gray-100 text-gray-800'
-                                                        }`}>
-                                                        {project['Trạng thái'] || 'Chưa xác định'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium 
-                                                    ${project['Check'] === 'Đạt'
-                                                            ? 'bg-green-100 text-green-800'
-                                                            : project['Check'] === 'Trung bình'
-                                                                ? 'bg-yellow-100 text-yellow-800'
-                                                                : project['Check'] === 'Xấu'
-                                                                    ? 'bg-red-100 text-red-800'
+                                        currentItems.map((project, index) => {
+                                            // Tính chênh lệch giữa HSHC và doanh thu nội suy
+                                            const hshc = parseFloat(project['Số tiền HSHC Trước thuế']) || 0;
+                                            const noiSuy = parseFloat(project['Doanh thu nội suy']) || 0;
+                                            const chenhLech = hshc - noiSuy;
+                                            const chenhLechPercent = hshc > 0 ? (chenhLech / hshc * 100).toFixed(1) : 0;
+
+                                            return (
+                                                <tr key={index} className="hover:bg-gray-50 transition-colors">
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                        {project['Mã kế hoạch']}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                        {project['POP'] || '—'}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                        {project['Khu vực'] || '—'}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                        {formatDate(project['Ngày nhận kế hoạch'])}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                        {formatCurrency(project['Số tiền HSHC Trước thuế'])}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                        {formatCurrency(project['Doanh thu tạm tính'])}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium 
+                                    ${project['Trạng thái'] === 'Hoàn thành'
+                                                                ? 'bg-green-100 text-green-800'
+                                                                : project['Trạng thái'] === 'Đang thực hiện'
+                                                                    ? 'bg-blue-100 text-blue-800'
                                                                     : 'bg-gray-100 text-gray-800'
-                                                        }`}>
-                                                        {project['Check'] || 'Chưa đánh giá'}
-                                                    </span>
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {formatCurrency(project['Nội suy kéo'])}
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {formatCurrency(project['Nội suy hàn'])}
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {formatCurrency(project['Doanh thu nội suy'])}
-                                                </td>
-                                            </tr>
-                                        ))
+                                                            }`}>
+                                                            {project['Trạng thái'] || 'Chưa xác định'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                                        <span className={`px-2 py-1 rounded-full text-xs font-medium 
+                                    ${project['Check'] === 'Đạt'
+                                                                ? 'bg-green-100 text-green-800'
+                                                                : project['Check'] === 'Trung bình'
+                                                                    ? 'bg-yellow-100 text-yellow-800'
+                                                                    : project['Check'] === 'Xấu'
+                                                                        ? 'bg-red-100 text-red-800'
+                                                                        : 'bg-gray-100 text-gray-800'
+                                                            }`}>
+                                                            {project['Check'] || 'Chưa đánh giá'}
+                                                        </span>
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                        {formatCurrency(project['Nội suy kéo'])}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                        {formatCurrency(project['Nội suy hàn'])}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                        {formatCurrency(project['Doanh thu nội suy'])}
+                                                    </td>
+                                                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium">
+                                                        <span className={chenhLech > 0 ? 'text-red-600' : 'text-green-600'}>
+                                                            {formatCurrency(chenhLech)} ({chenhLechPercent}%)
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })
                                     ) : (
                                         <tr>
-                                            <td colSpan="7" className="px-4 py-6 text-center text-sm text-gray-500">
+                                            <td colSpan="12" className="px-4 py-6 text-center text-sm text-gray-500">
                                                 Không tìm thấy dự án nào phù hợp với tiêu chí tìm kiếm
                                             </td>
                                         </tr>
@@ -1797,107 +1899,107 @@ const getChartConfig = () => {
                         )}
                     </div>
                     {/* Bảng thống kê chi tiêu theo tháng */}
-<div className="mb-8">
-  <h2 className="text-lg font-semibold text-gray-800 mb-4">Thống kê chi tiêu theo tháng</h2>
-  <div className="overflow-x-auto">
-    <table className="min-w-full divide-y divide-gray-200">
-      <thead className="bg-gray-50">
-        <tr>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tháng</th>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số phiếu chi</th>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tổng chi tiêu</th>
-        </tr>
-      </thead>
-      <tbody className="bg-white divide-y divide-gray-200">
-        {Object.entries(calculateMonthlyChiStatistics()).map(([month, stats]) => (
-          <tr key={month}>
-            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{month}</td>
-            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{stats.chiCount}</td>
-            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(stats.totalAmount)}</td>
-          </tr>
-        ))}
-        <tr className="bg-gray-50 font-medium">
-          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">Tổng cộng</td>
-          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-            {chiData.filter(chi => chi['Năm'] === filterYear).length}
-          </td>
-          <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-            {formatCurrency(calculateTotalExpenses())}
-          </td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-</div>
+                    <div className="mb-8">
+                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Thống kê chi tiêu theo tháng</h2>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tháng</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số phiếu chi</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tổng chi tiêu</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {Object.entries(calculateMonthlyChiStatistics()).map(([month, stats]) => (
+                                        <tr key={month}>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{month}</td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{stats.chiCount}</td>
+                                            <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(stats.totalAmount)}</td>
+                                        </tr>
+                                    ))}
+                                    <tr className="bg-gray-50 font-medium">
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">Tổng cộng</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                                            {chiData.filter(chi => chi['Năm'] === filterYear).length}
+                                        </td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                                            {formatCurrency(calculateTotalExpenses())}
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
 
-{/* Danh sách chi tiêu (tùy chọn) - có thể thêm vào nếu muốn hiển thị danh sách chi tiêu chi tiết */}
-<div className="mb-8">
-  <h2 className="text-lg font-semibold text-gray-800 mb-4">Danh sách chi tiêu</h2>
-  <div className="overflow-x-auto">
-    <table className="min-w-full divide-y divide-gray-200">
-      <thead className="bg-gray-50">
-        <tr>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã chuyển khoản</th>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Khu vực</th>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dự án</th>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã CHI</th>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày giải ngân</th>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số tiền</th>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đối tượng</th>
-          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
-        </tr>
-      </thead>
-      <tbody className="bg-white divide-y divide-gray-200">
-        {chiData
-          .filter(chi => chi['Năm'] === filterYear)
-          .slice(0, 10) // Giới hạn số lượng hiển thị
-          .map((chi, index) => (
-            <tr key={index} className="hover:bg-gray-50 transition-colors">
-              <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                {chi['Mã chuyển khoản'] || '—'}
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                {chi['KHU VỰC'] || '—'}
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                {chi['Dự án'] || '—'}
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                {chi['Mã CHI'] || '—'}
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                {formatDate(chi['Ngày giải ngân'])}
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                {formatCurrency(chi['SỐ TIỀN'])}
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                {chi['ĐỐI TƯỢNG'] || '—'}
-              </td>
-              <td className="px-4 py-4 whitespace-nowrap text-sm">
-                <span className={`px-2 py-1 rounded-full text-xs font-medium 
-                  ${chi['TRẠNG THÁI'] === 'Hoàn thành' 
-                    ? 'bg-green-100 text-green-800' 
-                    : chi['TRẠNG THÁI'] === 'Đang xử lý' 
-                      ? 'bg-yellow-100 text-yellow-800' 
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                  {chi['TRẠNG THÁI'] || 'Chưa xác định'}
-                </span>
-              </td>
-            </tr>
-          ))}
-        {chiData.filter(chi => chi['Năm'] === filterYear).length === 0 && (
-          <tr>
-            <td colSpan="8" className="px-4 py-6 text-center text-sm text-gray-500">
-              Không có dữ liệu chi tiêu cho năm {filterYear}
-            </td>
-          </tr>
-        )}
-      </tbody>
-    </table>
-  </div>
-</div>
+                    {/* Danh sách chi tiêu (tùy chọn) - có thể thêm vào nếu muốn hiển thị danh sách chi tiêu chi tiết */}
+                    <div className="mb-8">
+                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Danh sách chi tiêu</h2>
+                        <div className="overflow-x-auto">
+                            <table className="min-w-full divide-y divide-gray-200">
+                                <thead className="bg-gray-50">
+                                    <tr>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã chuyển khoản</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Khu vực</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Dự án</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mã CHI</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Ngày giải ngân</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số tiền</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Đối tượng</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trạng thái</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="bg-white divide-y divide-gray-200">
+                                    {chiData
+                                        .filter(chi => chi['Năm'] === filterYear)
+                                        .slice(0, 10) // Giới hạn số lượng hiển thị
+                                        .map((chi, index) => (
+                                            <tr key={index} className="hover:bg-gray-50 transition-colors">
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                    {chi['Mã chuyển khoản'] || '—'}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {chi['KHU VỰC'] || '—'}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {chi['Dự án'] || '—'}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {chi['Mã CHI'] || '—'}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {formatDate(chi['Ngày giải ngân'])}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {formatCurrency(chi['SỐ TIỀN'])}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {chi['ĐỐI TƯỢNG'] || '—'}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm">
+                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium 
+                  ${chi['TRẠNG THÁI'] === 'Hoàn thành'
+                                                            ? 'bg-green-100 text-green-800'
+                                                            : chi['TRẠNG THÁI'] === 'Đang xử lý'
+                                                                ? 'bg-yellow-100 text-yellow-800'
+                                                                : 'bg-gray-100 text-gray-800'
+                                                        }`}>
+                                                        {chi['TRẠNG THÁI'] || 'Chưa xác định'}
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        ))}
+                                    {chiData.filter(chi => chi['Năm'] === filterYear).length === 0 && (
+                                        <tr>
+                                            <td colSpan="8" className="px-4 py-6 text-center text-sm text-gray-500">
+                                                Không có dữ liệu chi tiêu cho năm {filterYear}
+                                            </td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
                 </div>
             </div>
 
