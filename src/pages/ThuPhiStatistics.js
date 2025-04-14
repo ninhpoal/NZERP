@@ -27,83 +27,82 @@ ChartJS.register(
     ChartDataLabels
 );
 
-const ChiPhiStatistics = () => {
+const ThuPhiStatistics = () => {
     // State Management
-    const [chiData, setChiData] = useState([]);
+    const [thuData, setThuData] = useState([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState('');
 
     const [startDate, setStartDate] = useState(null);
     const [endDate, setEndDate] = useState(null);
-    const [sortConfig, setSortConfig] = useState({ key: 'Ngày giải ngân', direction: 'descending' });
+    const [sortConfig, setSortConfig] = useState({ key: 'Thời gian', direction: 'descending' });
     const [showFilters, setShowFilters] = useState(false);
     const [chartType, setChartType] = useState('monthly'); // 'monthly', 'area', 'employee'
-    const [groupBy, setGroupBy] = useState('month'); // 'month', 'area', 'machi', 'nhanvien', 'tkchi'
+    const [groupBy, setGroupBy] = useState('month'); // 'month', 'area', 'mathu', 'nhanvien', 'tkthu'
     const [filterYear, setFilterYear] = useState([new Date().getFullYear()]);
-
 
     const [filterMonths, setFilterMonths] = useState([`Tháng ${new Date().getMonth() + 1}`]);
     const [filterArea, setFilterArea] = useState(['TẤT CẢ']);
-    const [filterStatus, setFilterStatus] = useState(['TẤT CẢ']);
-    const [filterMaChi, setFilterMaChi] = useState(['TẤT CẢ']);
+    const [filterMaThu, setFilterMaThu] = useState(['TẤT CẢ']);
     const [filterNhanVien, setFilterNhanVien] = useState(['TẤT CẢ']);
+    const [filterTKTHU, setFilterTKTHU] = useState(['TẤT CẢ']);
     const [filterTKCHI, setFilterTKCHI] = useState(['TẤT CẢ']);
+
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
 
     // Chart ref
     const chartRef = useRef(null);
+
     const resetFilters = () => {
         setSearch('');
         setFilterArea(['TẤT CẢ']);
-        setFilterStatus(['TẤT CẢ']);
-        setFilterYear([new Date().getFullYear()]);
-
+        setFilterYear(new Date().getFullYear());
 
         setFilterMonths([`Tháng ${new Date().getMonth() + 1}`]);
-        setFilterMaChi(['TẤT CẢ']);
+        setFilterMaThu(['TẤT CẢ']);
         setFilterNhanVien(['TẤT CẢ']);
+        setFilterTKTHU(['TẤT CẢ']);
         setFilterTKCHI(['TẤT CẢ']);
         setStartDate(null);
         setEndDate(null);
         setCurrentPage(1);
     };
-    // Fetch chi data
-    const fetchChiData = async () => {
+
+    // Fetch thu data
+    const fetchThuData = async () => {
         try {
             setLoading(true);
-            const response = await authUtils.apiRequest('CHI', 'Find', {});
+            const response = await authUtils.apiRequestThuChi('THU', 'Find', {});
 
-            // Transform dữ liệu chi
-            const transformedChiData = response.map(chi => ({
-                ...chi,
-                'Ngày giải ngân': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']) : null,
-                'Ngày giao thực hiện giao dịch': chi['Ngày giao thực hiện giao dịch'] ? new Date(chi['Ngày giao thực hiện giao dịch']) : null,
-                'SỐ TIỀN': parseFloat(chi['SỐ TIỀN']) || 0,
-                'Số tiền chuyển khoản': parseFloat(chi['Số tiền chuyển khoản']) || 0,
-                'Tháng': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']).getMonth() + 1 : null,
-                'Năm': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']).getFullYear() : null
+            // Transform dữ liệu thu
+            const transformedThuData = response.map(thu => ({
+                ...thu,
+                'Thời gian': thu['Thời gian'] ? new Date(thu['Thời gian']) : null,
+                'Số tiền': parseFloat(thu['Số tiền']) || 0,
+                'Tháng': thu['Thời gian'] ? new Date(thu['Thời gian']).getMonth() + 1 : null,
+                'Năm': thu['Thời gian'] ? new Date(thu['Thời gian']).getFullYear() : null
             }));
 
-            setChiData(transformedChiData);
+            setThuData(transformedThuData);
             setLoading(false);
-            toast.success('Đã tải dữ liệu chi tiêu thành công');
+            toast.success('Đã tải dữ liệu thu thành công');
         } catch (error) {
-            console.error('Error fetching chi data:', error);
-            toast.error('Lỗi khi tải dữ liệu chi tiêu');
+            console.error('Error fetching thu data:', error);
+            toast.error('Lỗi khi tải dữ liệu thu');
             setLoading(false);
         }
     };
 
     useEffect(() => {
-        fetchChiData();
+        fetchThuData();
     }, []);
 
     // Reset pagination when filters change
     useEffect(() => {
         setCurrentPage(1);
-    }, [search, filterArea, filterStatus, filterYear, filterMonths, filterMaChi, filterNhanVien, filterTKCHI, startDate, endDate]);
+    }, [search, filterArea, filterYear, filterMonths, filterMaThu, filterNhanVien, filterTKTHU, filterTKCHI, startDate, endDate]);
 
     // Sorting function
     const requestSort = (key) => {
@@ -116,7 +115,7 @@ const ChiPhiStatistics = () => {
 
     // Get sorted items
     const getSortedItems = useMemo(() => {
-        const sortableItems = [...chiData];
+        const sortableItems = [...thuData];
         if (sortConfig.key) {
             sortableItems.sort((a, b) => {
                 const keyA = a[sortConfig.key];
@@ -151,20 +150,20 @@ const ChiPhiStatistics = () => {
             });
         }
         return sortableItems;
-    }, [chiData, sortConfig]);
+    }, [thuData, sortConfig]);
 
     // Get unique values for filters
-    const areas = ['TẤT CẢ', ...new Set(chiData.map(chi => chi['KHU VỰC']).filter(Boolean))];
-    const statuses = ['TẤT CẢ', ...new Set(chiData.map(chi => chi['TRẠNG THÁI']).filter(Boolean))];
-    const maChiList = ['TẤT CẢ', ...new Set(chiData.map(chi => chi['Mã CHI']).filter(Boolean))];
-    const nhanVienList = ['TẤT CẢ', ...new Set(chiData.map(chi => chi['NHÂN VIÊN THỰC HIỆN']).filter(Boolean))];
-    const tkchiList = ['TẤT CẢ', ...new Set(chiData.map(chi => chi['TKCHI']).filter(Boolean))];
+    const areas = ['TẤT CẢ', ...new Set(thuData.map(thu => thu['KHU VỰC']).filter(Boolean))];
+    const maThuList = ['TẤT CẢ', ...new Set(thuData.map(thu => thu['Mã THU']).filter(Boolean))];
+    const nhanVienList = ['TẤT CẢ', ...new Set(thuData.map(thu => thu['NHÂN VIÊN THỰC HIỆN']).filter(Boolean))];
+    const tkthuList = ['TẤT CẢ', ...new Set(thuData.map(thu => thu['Tài khoản thu']).filter(Boolean))];
+    const tkchiList = ['TẤT CẢ', ...new Set(thuData.map(thu => thu['Tài khoản chi']).filter(Boolean))];
 
     // Get years for filtering
     const years = useMemo(() => {
-        const uniqueYears = [...new Set(chiData
-            .filter(chi => chi['Ngày giải ngân'])
-            .map(chi => new Date(chi['Ngày giải ngân']).getFullYear())
+        const uniqueYears = [...new Set(thuData
+            .filter(thu => thu['Thời gian'])
+            .map(thu => new Date(thu['Thời gian']).getFullYear())
         )];
 
         // Sort years in descending order
@@ -176,7 +175,7 @@ const ChiPhiStatistics = () => {
         }
 
         return uniqueYears;
-    }, [chiData]);
+    }, [thuData]);
 
     // Get months for filtering
     const months = ['TẤT CẢ', 'Tháng 1', 'Tháng 2', 'Tháng 3', 'Tháng 4', 'Tháng 5', 'Tháng 6',
@@ -184,54 +183,53 @@ const ChiPhiStatistics = () => {
 
     // Filtered items based on search and filters
     const filteredItems = useMemo(() => {
-        return getSortedItems.filter(chi => {
+        return getSortedItems.filter(thu => {
             const matchesSearch =
-                (chi['Mã chuyển khoản']?.toLowerCase().includes(search.toLowerCase())) ||
-                (chi['IDPHIEU']?.toLowerCase().includes(search.toLowerCase())) ||
-                (chi['Mã CHI']?.toLowerCase().includes(search.toLowerCase())) ||
-                (chi['NỘI DUNG']?.toLowerCase().includes(search.toLowerCase())) ||
-                (chi['ĐỐI TƯỢNG']?.toLowerCase().includes(search.toLowerCase()));
+                (thu['IDTHU']?.toLowerCase().includes(search.toLowerCase())) ||
+                (thu['Mã THU']?.toLowerCase().includes(search.toLowerCase())) ||
+                (thu['Nội dung']?.toLowerCase().includes(search.toLowerCase())) ||
+                (thu['Ghi chú']?.toLowerCase().includes(search.toLowerCase()));
 
-            const matchesArea = filterArea.includes('TẤT CẢ') || filterArea.includes(chi['KHU VỰC']);
-            const matchesStatus = filterStatus.includes('TẤT CẢ') || filterStatus.includes(chi['TRẠNG THÁI']);
-            const matchesMaChi = filterMaChi.includes('TẤT CẢ') || filterMaChi.includes(chi['Mã CHI']);
-            const matchesNhanVien = filterNhanVien.includes('TẤT CẢ') || filterNhanVien.includes(chi['NHÂN VIÊN THỰC HIỆN']);
-            const matchesTKCHI = filterTKCHI.includes('TẤT CẢ') || filterTKCHI.includes(chi['TKCHI']);
+            const matchesArea = filterArea.includes('TẤT CẢ') || filterArea.includes(thu['KHU VỰC']);
+            const matchesMaThu = filterMaThu.includes('TẤT CẢ') || filterMaThu.includes(thu['Mã THU']);
+            const matchesNhanVien = filterNhanVien.includes('TẤT CẢ') || filterNhanVien.includes(thu['NHÂN VIÊN THỰC HIỆN']);
+            const matchesTKTHU = filterTKTHU.includes('TẤT CẢ') || filterTKTHU.includes(thu['Tài khoản thu']);
+            const matchesTKCHI = filterTKCHI.includes('TẤT CẢ') || filterTKCHI.includes(thu['Tài khoản chi']);
 
-            const chiYear = chi['Ngày giải ngân']
-                ? new Date(chi['Ngày giải ngân']).getFullYear()
+            const thuYear = thu['Thời gian']
+                ? new Date(thu['Thời gian']).getFullYear()
                 : null;
 
-            const matchesYear = filterYear.includes(chiYear);
+            // Thay đổi ở đây - kiểm tra xem năm có trong mảng filterYear không
+            const matchesYear = filterYear.includes(thuYear);
 
-
-
-            const chiMonth = chi['Ngày giải ngân']
-                ? new Date(chi['Ngày giải ngân']).getMonth() + 1
+            const thuMonth = thu['Thời gian']
+                ? new Date(thu['Thời gian']).getMonth() + 1
                 : null;
 
-            const matchesMonth = filterMonths.includes('TẤT CẢ') || (chi['Ngày giải ngân'] && filterMonths.some(monthName => {
+            const matchesMonth = filterMonths.includes('TẤT CẢ') || (thu['Thời gian'] && filterMonths.some(monthName => {
                 if (monthName === 'TẤT CẢ') return true;
                 const monthNumber = parseInt(monthName.replace('Tháng ', ''));
-                return new Date(chi['Ngày giải ngân']).getMonth() + 1 === monthNumber;
+                return new Date(thu['Thời gian']).getMonth() + 1 === monthNumber;
             }));
 
             // Check date range
             let matchesDateRange = true;
             if (startDate && endDate) {
-                const chiDate = chi['Ngày giải ngân'];
-                if (chiDate) {
-                    matchesDateRange = chiDate >= startDate && chiDate <= endDate;
+                const thuDate = thu['Thời gian'];
+                if (thuDate) {
+                    matchesDateRange = thuDate >= startDate && thuDate <= endDate;
                 } else {
                     matchesDateRange = false;
                 }
             }
 
-            return matchesSearch && matchesArea && matchesStatus && matchesYear &&
-                matchesMonth && matchesMaChi && matchesNhanVien && matchesTKCHI && matchesDateRange;
+            return matchesSearch && matchesArea && matchesYear &&
+                matchesMonth && matchesMaThu && matchesNhanVien && matchesTKTHU &&
+                matchesTKCHI && matchesDateRange;
         });
-    }, [getSortedItems, search, filterArea, filterStatus, filterYear, filterMonths,
-        filterMaChi, filterNhanVien, filterTKCHI, startDate, endDate]);
+    }, [getSortedItems, search, filterArea, filterYear, filterMonths,
+        filterMaThu, filterNhanVien, filterTKTHU, filterTKCHI, startDate, endDate]);
     // Pagination calculations
     const indexOfLastItem = currentPage * itemsPerPage;
     const indexOfFirstItem = indexOfLastItem - itemsPerPage;
@@ -249,15 +247,15 @@ const ChiPhiStatistics = () => {
                     filterYear.forEach(year => {
                         for (let month = 1; month <= 12; month++) {
                             const monthYearKey = `Tháng ${month}/${year}`;
-                            const monthItems = filteredItems.filter(chi => {
-                                if (!chi['Ngày giải ngân']) return false;
-                                const chiDate = new Date(chi['Ngày giải ngân']);
-                                return chiDate.getMonth() + 1 === month && chiDate.getFullYear() === year;
+                            const monthItems = filteredItems.filter(thu => {
+                                if (!thu['Thời gian']) return false;
+                                const thuDate = new Date(thu['Thời gian']);
+                                return thuDate.getMonth() + 1 === month && thuDate.getFullYear() === year;
                             });
 
                             stats[monthYearKey] = {
                                 count: monthItems.length,
-                                totalAmount: monthItems.reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0)
+                                totalAmount: monthItems.reduce((sum, thu) => sum + (thu['Số tiền'] || 0), 0)
                             };
                         }
                     });
@@ -265,15 +263,15 @@ const ChiPhiStatistics = () => {
                     // Nếu chỉ có một năm, giữ nguyên logic cũ
                     for (let month = 1; month <= 12; month++) {
                         const monthName = `Tháng ${month}`;
-                        const monthItems = filteredItems.filter(chi => {
-                            if (!chi['Ngày giải ngân']) return false;
-                            const chiDate = new Date(chi['Ngày giải ngân']);
-                            return chiDate.getMonth() + 1 === month && chiDate.getFullYear() === filterYear[0];
+                        const monthItems = filteredItems.filter(thu => {
+                            if (!thu['Thời gian']) return false;
+                            const thuDate = new Date(thu['Thời gian']);
+                            return thuDate.getMonth() + 1 === month && thuDate.getFullYear() === filterYear[0];
                         });
 
                         stats[monthName] = {
                             count: monthItems.length,
-                            totalAmount: monthItems.reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0)
+                            totalAmount: monthItems.reduce((sum, thu) => sum + (thu['Số tiền'] || 0), 0)
                         };
                     }
                 }
@@ -282,21 +280,21 @@ const ChiPhiStatistics = () => {
             case 'area':
                 // Group by area
                 areas.filter(area => area !== 'TẤT CẢ').forEach(area => {
-                    const areaItems = filteredItems.filter(chi => chi['KHU VỰC'] === area);
+                    const areaItems = filteredItems.filter(thu => thu['KHU VỰC'] === area);
                     stats[area] = {
                         count: areaItems.length,
-                        totalAmount: areaItems.reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0)
+                        totalAmount: areaItems.reduce((sum, thu) => sum + (thu['Số tiền'] || 0), 0)
                     };
                 });
                 break;
 
-            case 'machi':
-                // Group by Mã CHI
-                maChiList.filter(maChi => maChi !== 'TẤT CẢ').forEach(maChi => {
-                    const maChiItems = filteredItems.filter(chi => chi['Mã CHI'] === maChi);
-                    stats[maChi] = {
-                        count: maChiItems.length,
-                        totalAmount: maChiItems.reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0)
+            case 'mathu':
+                // Group by Mã THU
+                maThuList.filter(maThu => maThu !== 'TẤT CẢ').forEach(maThu => {
+                    const maThuItems = filteredItems.filter(thu => thu['Mã THU'] === maThu);
+                    stats[maThu] = {
+                        count: maThuItems.length,
+                        totalAmount: maThuItems.reduce((sum, thu) => sum + (thu['Số tiền'] || 0), 0)
                     };
                 });
                 break;
@@ -304,21 +302,21 @@ const ChiPhiStatistics = () => {
             case 'nhanvien':
                 // Group by employee
                 nhanVienList.filter(nv => nv !== 'TẤT CẢ').forEach(nv => {
-                    const nvItems = filteredItems.filter(chi => chi['NHÂN VIÊN THỰC HIỆN'] === nv);
+                    const nvItems = filteredItems.filter(thu => thu['NHÂN VIÊN THỰC HIỆN'] === nv);
                     stats[nv] = {
                         count: nvItems.length,
-                        totalAmount: nvItems.reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0)
+                        totalAmount: nvItems.reduce((sum, thu) => sum + (thu['Số tiền'] || 0), 0)
                     };
                 });
                 break;
 
-            case 'tkchi':
-                // Group by TKCHI
-                tkchiList.filter(tk => tk !== 'TẤT CẢ').forEach(tk => {
-                    const tkItems = filteredItems.filter(chi => chi['TKCHI'] === tk);
+            case 'tkthu':
+                // Group by Tài khoản thu
+                tkthuList.filter(tk => tk !== 'TẤT CẢ').forEach(tk => {
+                    const tkItems = filteredItems.filter(thu => thu['Tài khoản thu'] === tk);
                     stats[tk] = {
                         count: tkItems.length,
-                        totalAmount: tkItems.reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0)
+                        totalAmount: tkItems.reduce((sum, thu) => sum + (thu['Số tiền'] || 0), 0)
                     };
                 });
                 break;
@@ -339,7 +337,6 @@ const ChiPhiStatistics = () => {
         const yearDisplay = filterYear.length > 1
             ? `Năm ${filterYear.join(', ')}`
             : `Năm ${filterYear[0]}`;
-
         const colors = [
             '#4F46E5', '#EC4899', '#10B981', '#8B5CF6', '#F59E0B', '#EF4444',
             '#06B6D4', '#84CC16', '#F97316', '#6366F1', '#14B8A6', '#D946EF'
@@ -360,7 +357,7 @@ const ChiPhiStatistics = () => {
                             if (label) {
                                 label += ': ';
                             }
-                            if (context.dataset.label.includes('Chi tiêu')) {
+                            if (context.dataset.label.includes('Thu')) {
                                 label += formatCurrency(context.parsed.y || context.parsed);
                             } else {
                                 label += context.parsed.y || context.parsed;
@@ -399,7 +396,7 @@ const ChiPhiStatistics = () => {
                         datasets: [
                             {
                                 type: 'bar',
-                                label: 'Số phiếu chi',
+                                label: 'Số phiếu thu',
                                 data: counts,
                                 backgroundColor: '#4F46E5',
                                 yAxisID: 'y',
@@ -411,7 +408,7 @@ const ChiPhiStatistics = () => {
                             },
                             {
                                 type: 'bar',
-                                label: 'Tổng chi tiêu',
+                                label: 'Tổng thu',
                                 data: values,
                                 backgroundColor: '#F59E0B',
                                 yAxisID: 'y1',
@@ -441,7 +438,7 @@ const ChiPhiStatistics = () => {
                                 position: 'right',
                                 title: {
                                     display: true,
-                                    text: 'Chi tiêu (VNĐ)'
+                                    text: 'Số tiền (VNĐ)'
                                 },
                                 grid: {
                                     drawOnChartArea: false
@@ -452,8 +449,7 @@ const ChiPhiStatistics = () => {
                             ...commonOptions.plugins,
                             title: {
                                 display: true,
-                                text: `Thống kê chi tiêu theo ${getGroupLabel(groupBy)} (${yearDisplay})`
-                                ,
+                                text: `Thống kê thu theo ${getGroupLabel(groupBy)} (${yearDisplay})`,
                                 font: {
                                     size: 16
                                 }
@@ -469,7 +465,7 @@ const ChiPhiStatistics = () => {
                         labels: labels,
                         datasets: [
                             {
-                                label: 'Tổng chi tiêu',
+                                label: 'Tổng thu',
                                 data: values,
                                 backgroundColor: colors.slice(0, labels.length),
                                 borderWidth: 1
@@ -482,9 +478,9 @@ const ChiPhiStatistics = () => {
                             ...commonOptions.plugins,
                             title: {
                                 display: true,
-                                text: `Phân bổ chi tiêu theo ${getGroupLabel(groupBy)} (${yearDisplay})`
-
+                                text: `Phân bổ thu theo ${getGroupLabel(groupBy)} (${yearDisplay})`
                                 ,
+
                                 font: {
                                     size: 16
                                 }
@@ -503,21 +499,21 @@ const ChiPhiStatistics = () => {
         switch (group) {
             case 'month': return 'tháng';
             case 'area': return 'khu vực';
-            case 'machi': return 'mã chi';
+            case 'mathu': return 'mã thu';
             case 'nhanvien': return 'nhân viên';
-            case 'tkchi': return 'tài khoản chi';
+            case 'tkthu': return 'tài khoản thu';
             default: return group;
         }
     };
 
     // Calculate summary statistics
     const statistics = useMemo(() => {
-        const totalExpenses = filteredItems.reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0);
+        const totalIncome = filteredItems.reduce((sum, thu) => sum + (thu['Số tiền'] || 0), 0);
         const totalCount = filteredItems.length;
-        const avgPerTransaction = totalCount > 0 ? totalExpenses / totalCount : 0;
+        const avgPerTransaction = totalCount > 0 ? totalIncome / totalCount : 0;
 
         return {
-            totalExpenses,
+            totalIncome,
             totalCount,
             avgPerTransaction
         };
@@ -554,7 +550,7 @@ const ChiPhiStatistics = () => {
 
     // Refresh data
     const handleRefreshData = () => {
-        fetchChiData();
+        fetchThuData();
         toast.info('Đang làm mới dữ liệu...');
     };
 
@@ -562,20 +558,18 @@ const ChiPhiStatistics = () => {
     const exportToExcel = () => {
         try {
             // Prepare data for export
-            const exportData = filteredItems.map(chi => ({
-                'Mã chuyển khoản': chi['Mã chuyển khoản'] || '',
-                'IDPHIEU': chi['IDPHIEU'] || '',
-                'KHU VỰC': chi['KHU VỰC'] || '',
-                'Dự án': chi['Dự án'] || '',
-                'Mã CHI': chi['Mã CHI'] || '',
-                'Ngày giải ngân': formatDate(chi['Ngày giải ngân']),
-                'SỐ TIỀN': chi['SỐ TIỀN'] || 0,
-                'NỘI DUNG': chi['NỘI DUNG'] || '',
-                'NHÂN VIÊN THỰC HIỆN': chi['NHÂN VIÊN THỰC HIỆN'] || '',
-                'ĐỐI TƯỢNG': chi['ĐỐI TƯỢNG'] || '',
-                'TRẠNG THÁI': chi['TRẠNG THÁI'] || '',
-                'TKCHI': chi['TKCHI'] || '',
-                'HOADON': chi['HOADON'] || ''
+            const exportData = filteredItems.map(thu => ({
+                'IDTHU': thu['IDTHU'] || '',
+                'KHU VỰC': thu['KHU VỰC'] || '',
+                'Dự án': thu['Dự án'] || '',
+                'Mã THU': thu['Mã THU'] || '',
+                'Thời gian': formatDate(thu['Thời gian']),
+                'Số tiền': thu['Số tiền'] || 0,
+                'Nội dung': thu['Nội dung'] || '',
+                'NHÂN VIÊN THỰC HIỆN': thu['NHÂN VIÊN THỰC HIỆN'] || '',
+                'Tài khoản thu': thu['Tài khoản thu'] || '',
+                'Tài khoản chi': thu['Tài khoản chi'] || '',
+                'Ghi chú': thu['Ghi chú'] || ''
             }));
 
             // Create worksheet
@@ -583,13 +577,13 @@ const ChiPhiStatistics = () => {
 
             // Create workbook
             const wb = XLSX.utils.book_new();
-            XLSX.utils.book_append_sheet(wb, ws, 'Thống kê chi tiêu');
+            XLSX.utils.book_append_sheet(wb, ws, 'Thống kê thu');
 
             // Generate statistics worksheet
             const statsData = [
-                { Thống_kê: 'Tổng số phiếu chi', Giá_trị: statistics.totalCount },
-                { Thống_kê: 'Tổng chi tiêu', Giá_trị: statistics.totalExpenses },
-                { Thống_kê: 'Chi tiêu trung bình/phiếu', Giá_trị: statistics.avgPerTransaction }
+                { Thống_kê: 'Tổng số phiếu thu', Giá_trị: statistics.totalCount },
+                { Thống_kê: 'Tổng thu', Giá_trị: statistics.totalIncome },
+                { Thống_kê: 'Thu trung bình/phiếu', Giá_trị: statistics.avgPerTransaction }
             ];
 
             const statsWs = XLSX.utils.json_to_sheet(statsData);
@@ -600,7 +594,7 @@ const ChiPhiStatistics = () => {
             const monthData = Object.entries(monthStats).map(([month, data]) => ({
                 Tháng: month,
                 Số_phiếu: data.count,
-                Tổng_chi_tiêu: data.totalAmount
+                Tổng_thu: data.totalAmount
             }));
             const monthWs = XLSX.utils.json_to_sheet(monthData);
             XLSX.utils.book_append_sheet(wb, monthWs, 'Theo tháng');
@@ -609,13 +603,13 @@ const ChiPhiStatistics = () => {
             const areaData = Object.entries(areaStats).map(([area, data]) => ({
                 Khu_vực: area,
                 Số_phiếu: data.count,
-                Tổng_chi_tiêu: data.totalAmount
+                Tổng_thu: data.totalAmount
             }));
             const areaWs = XLSX.utils.json_to_sheet(areaData);
             XLSX.utils.book_append_sheet(wb, areaWs, 'Theo khu vực');
 
             // Save file
-            const fileName = `Thong_ke_chi_tieu_${new Date().toISOString().split('T')[0]}.xlsx`;
+            const fileName = `Thong_ke_thu_${new Date().toISOString().split('T')[0]}.xlsx`;
             XLSX.writeFile(wb, fileName);
 
             toast.success('Đã xuất dữ liệu thành công');
@@ -704,7 +698,7 @@ const ChiPhiStatistics = () => {
                 <div className="bg-white rounded-xl shadow-sm p-5 mb-6 border border-gray-100 print:shadow-none print:border-none">
                     {/* Header Section */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:hidden">
-                        <h1 className="text-2xl font-bold text-gray-800">Thống Kê Chi Tiêu</h1>
+                        <h1 className="text-2xl font-bold text-gray-800">Thống Kê Thu</h1>
                         <div className="flex flex-wrap gap-2">
                             <button
                                 onClick={() => setShowFilters(!showFilters)}
@@ -743,7 +737,7 @@ const ChiPhiStatistics = () => {
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
                             <input
                                 type="text"
-                                placeholder="Tìm kiếm theo mã chuyển khoản, mã chi, nội dung..."
+                                placeholder="Tìm kiếm theo mã thu, nội dung, ghi chú..."
                                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all"
                                 value={search}
                                 onChange={(e) => setSearch(e.target.value)}
@@ -783,7 +777,6 @@ const ChiPhiStatistics = () => {
                                     </div>
 
                                     {/* Area filter */}
-                                    {/* Area filter */}
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Khu vực:</h3>
                                         <Select
@@ -815,32 +808,6 @@ const ChiPhiStatistics = () => {
                                             classNamePrefix="select"
                                         />
                                     </div>
-                                    {/* Status filter */}
-                                    <div>
-                                        <h3 className="text-sm font-medium text-gray-700 mb-2">Trạng thái:</h3>
-                                        <Select
-                                            isMulti
-                                            options={statuses.map(status => ({ value: status, label: status }))}
-                                            value={filterStatus.map(status => ({ value: status, label: status }))}
-                                            onChange={(selectedOptions) => {
-                                                if (selectedOptions.length === 0) {
-                                                    setFilterStatus(['TẤT CẢ']);
-                                                } else {
-                                                    const values = selectedOptions.map(option => option.value);
-                                                    if (values.includes('TẤT CẢ') && values.length > 1) {
-                                                        setFilterStatus(values.filter(v => v !== 'TẤT CẢ'));
-                                                    } else if (filterStatus.includes('TẤT CẢ') && !values.includes('TẤT CẢ')) {
-                                                        setFilterStatus(values);
-                                                    } else {
-                                                        setFilterStatus(values);
-                                                    }
-                                                }
-                                            }}
-                                            placeholder="Chọn trạng thái..."
-                                            className="basic-multi-select"
-                                            classNamePrefix="select"
-                                        />
-                                    </div>
 
                                     {/* Year filter */}
                                     <div>
@@ -853,6 +820,8 @@ const ChiPhiStatistics = () => {
                                                 if (selectedOptions.length === 0) {
                                                     // Nếu không chọn gì, mặc định là năm hiện tại
                                                     setFilterYear([new Date().getFullYear()]);
+
+
                                                 } else {
                                                     const values = selectedOptions.map(option => parseInt(option.value));
                                                     setFilterYear(values);
@@ -891,28 +860,28 @@ const ChiPhiStatistics = () => {
                                         />
                                     </div>
 
-                                    {/* Mã Chi filter */}
+                                    {/* Mã Thu filter */}
                                     <div>
-                                        <h3 className="text-sm font-medium text-gray-700 mb-2">Mã Chi:</h3>
+                                        <h3 className="text-sm font-medium text-gray-700 mb-2">Mã Thu:</h3>
                                         <Select
                                             isMulti
-                                            options={maChiList.map(maChi => ({ value: maChi, label: maChi }))}
-                                            value={filterMaChi.map(maChi => ({ value: maChi, label: maChi }))}
+                                            options={maThuList.map(maThu => ({ value: maThu, label: maThu }))}
+                                            value={filterMaThu.map(maThu => ({ value: maThu, label: maThu }))}
                                             onChange={(selectedOptions) => {
                                                 if (selectedOptions.length === 0) {
-                                                    setFilterMaChi(['TẤT CẢ']);
+                                                    setFilterMaThu(['TẤT CẢ']);
                                                 } else {
                                                     const values = selectedOptions.map(option => option.value);
                                                     if (values.includes('TẤT CẢ') && values.length > 1) {
-                                                        setFilterMaChi(values.filter(v => v !== 'TẤT CẢ'));
-                                                    } else if (filterMaChi.includes('TẤT CẢ') && !values.includes('TẤT CẢ')) {
-                                                        setFilterMaChi(values);
+                                                        setFilterMaThu(values.filter(v => v !== 'TẤT CẢ'));
+                                                    } else if (filterMaThu.includes('TẤT CẢ') && !values.includes('TẤT CẢ')) {
+                                                        setFilterMaThu(values);
                                                     } else {
-                                                        setFilterMaChi(values);
+                                                        setFilterMaThu(values);
                                                     }
                                                 }
                                             }}
-                                            placeholder="Chọn mã chi..."
+                                            placeholder="Chọn mã thu..."
                                             className="basic-multi-select"
                                             classNamePrefix="select"
                                         />
@@ -944,7 +913,35 @@ const ChiPhiStatistics = () => {
                                             classNamePrefix="select"
                                         />
                                     </div>
-                                    {/* TKCHI filter */}
+
+                                    {/* Tài khoản thu filter */}
+                                    <div>
+                                        <h3 className="text-sm font-medium text-gray-700 mb-2">Tài khoản Thu:</h3>
+                                        <Select
+                                            isMulti
+                                            options={tkthuList.map(tk => ({ value: tk, label: tk }))}
+                                            value={filterTKTHU.map(tk => ({ value: tk, label: tk }))}
+                                            onChange={(selectedOptions) => {
+                                                if (selectedOptions.length === 0) {
+                                                    setFilterTKTHU(['TẤT CẢ']);
+                                                } else {
+                                                    const values = selectedOptions.map(option => option.value);
+                                                    if (values.includes('TẤT CẢ') && values.length > 1) {
+                                                        setFilterTKTHU(values.filter(v => v !== 'TẤT CẢ'));
+                                                    } else if (filterTKTHU.includes('TẤT CẢ') && !values.includes('TẤT CẢ')) {
+                                                        setFilterTKTHU(values);
+                                                    } else {
+                                                        setFilterTKTHU(values);
+                                                    }
+                                                }
+                                            }}
+                                            placeholder="Chọn tài khoản thu..."
+                                            className="basic-multi-select"
+                                            classNamePrefix="select"
+                                        />
+                                    </div>
+
+                                    {/* Tài khoản chi filter */}
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Tài khoản Chi:</h3>
                                         <Select
@@ -970,6 +967,7 @@ const ChiPhiStatistics = () => {
                                             classNamePrefix="select"
                                         />
                                     </div>
+
                                     {/* Items per page */}
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Hiển thị:</h3>
@@ -980,7 +978,7 @@ const ChiPhiStatistics = () => {
                                                 className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 appearance-none pr-10"
                                             >
                                                 {[10, 25, 50, 100].map((size) => (
-                                                    <option key={size} value={size}>{size} phiếu chi</option>
+                                                    <option key={size} value={size}>{size} phiếu thu</option>
                                                 ))}
                                             </select>
                                             <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
@@ -993,28 +991,26 @@ const ChiPhiStatistics = () => {
 
                     {/* Statistics cards */}
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
-                            <h3 className="text-sm text-amber-700 mb-1">Tổng chi tiêu</h3>
-                            <p className="text-2xl font-bold text-amber-800">{formatCurrency(statistics.totalExpenses)}</p>
-                            <p className="text-xs text-amber-600 mt-1">Từ {statistics.totalCount} phiếu chi</p>
-                        </div>
                         <div className="bg-blue-50 border border-blue-100 rounded-lg p-4">
-                            <h3 className="text-sm text-blue-700 mb-1">Số phiếu chi</h3>
-                            <p className="text-2xl font-bold text-blue-800">{statistics.totalCount}</p>
-                            <p className="text-xs text-blue-600 mt-1">
-                                Thời gian: {startDate && endDate ? `${formatDate(startDate)} - ${formatDate(endDate)}` : `Năm ${filterYear.join(', ')}`}
-                            </p>  </div>
+                            <h3 className="text-sm text-blue-700 mb-1">Tổng thu</h3>
+                            <p className="text-2xl font-bold text-blue-800">{formatCurrency(statistics.totalIncome)}</p>
+                            <p className="text-xs text-blue-600 mt-1">Từ {statistics.totalCount} phiếu thu</p>
+                        </div>
                         <div className="bg-green-50 border border-green-100 rounded-lg p-4">
-                            <h3 className="text-sm text-green-700 mb-1">Chi tiêu trung bình/phiếu</h3>
-                            <p className="text-2xl font-bold text-green-800">{formatCurrency(statistics.avgPerTransaction)}</p>
-                            <p className="text-xs text-green-600 mt-1">&nbsp;</p>
+                            <h3 className="text-sm text-green-700 mb-1">Số phiếu thu</h3>
+                            <p className="text-2xl font-bold text-green-800">{statistics.totalCount}</p>
+                            <p className="text-xs text-green-600 mt-1">Thời gian: {startDate && endDate ? `${formatDate(startDate)} - ${formatDate(endDate)}` : `Năm ${filterYear.join(', ')}`}</p>  </div>
+                        <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
+                            <h3 className="text-sm text-amber-700 mb-1">Thu trung bình/phiếu</h3>
+                            <p className="text-2xl font-bold text-amber-800">{formatCurrency(statistics.avgPerTransaction)}</p>
+                            <p className="text-xs text-amber-600 mt-1">&nbsp;</p>
                         </div>
                     </div>
 
                     {/* Charts Section */}
                     <div className="mb-8">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-semibold text-gray-800">Thống kê chi tiêu</h2>
+                            <h2 className="text-lg font-semibold text-gray-800">Thống kê thu</h2>
                             <div className="flex space-x-2 print:hidden">
                                 <div className="mr-4">
                                     <select
@@ -1024,9 +1020,9 @@ const ChiPhiStatistics = () => {
                                     >
                                         <option value="month">Theo tháng</option>
                                         <option value="area">Theo khu vực</option>
-                                        <option value="machi">Theo mã chi</option>
+                                        <option value="mathu">Theo mã thu</option>
                                         <option value="nhanvien">Theo nhân viên</option>
-                                        <option value="tkchi">Theo tài khoản chi</option>
+                                        <option value="tkthu">Theo tài khoản thu</option>
                                     </select>
                                 </div>
                                 <button
@@ -1063,14 +1059,14 @@ const ChiPhiStatistics = () => {
 
                     {/* Bảng thống kê theo nhóm */}
                     <div className="mb-8">
-                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Thống kê chi tiêu theo {getGroupLabel(groupBy)}</h2>
+                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Thống kê thu theo {getGroupLabel(groupBy)}</h2>
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{getGroupLabel(groupBy)}</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số phiếu chi</th>
-                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tổng chi tiêu</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Số phiếu thu</th>
+                                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tổng thu</th>
                                         <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tỷ lệ (%)</th>
                                     </tr>
                                 </thead>
@@ -1081,8 +1077,8 @@ const ChiPhiStatistics = () => {
                                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{stats.count}</td>
                                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">{formatCurrency(stats.totalAmount)}</td>
                                             <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                {statistics.totalExpenses > 0 ?
-                                                    (stats.totalAmount / statistics.totalExpenses * 100).toFixed(2) + '%' :
+                                                {statistics.totalIncome > 0 ?
+                                                    (stats.totalAmount / statistics.totalIncome * 100).toFixed(2) + '%' :
                                                     '0%'}
                                             </td>
                                         </tr>
@@ -1090,7 +1086,7 @@ const ChiPhiStatistics = () => {
                                     <tr className="bg-gray-50 font-medium">
                                         <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">Tổng cộng</td>
                                         <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{statistics.totalCount}</td>
-                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{formatCurrency(statistics.totalExpenses)}</td>
+                                        <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{formatCurrency(statistics.totalIncome)}</td>
                                         <td className="px-4 py-4 whitespace-nowrap text-sm font-bold text-gray-900">100%</td>
                                     </tr>
                                 </tbody>
@@ -1100,17 +1096,16 @@ const ChiPhiStatistics = () => {
 
                     {/* Table Section */}
                     <div>
-                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Danh sách chi tiêu</h2>
+                        <h2 className="text-lg font-semibold text-gray-800 mb-4">Danh sách thu</h2>
                         <div className="overflow-x-auto">
                             <table className="min-w-full divide-y divide-gray-200">
                                 <thead className="bg-gray-50">
                                     <tr>
                                         <th scope="col"
                                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                            onClick={() => requestSort('Mã chuyển khoản')}>
-                                            Mã CK {getSortIcon('Mã chuyển khoản')}
+                                            onClick={() => requestSort('IDTHU')}>
+                                            ID Thu {getSortIcon('IDTHU')}
                                         </th>
-
                                         <th scope="col"
                                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
                                             onClick={() => requestSort('KHU VỰC')}>
@@ -1123,23 +1118,23 @@ const ChiPhiStatistics = () => {
                                         </th>
                                         <th scope="col"
                                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                            onClick={() => requestSort('Mã CHI')}>
-                                            Mã Chi {getSortIcon('Mã CHI')}
+                                            onClick={() => requestSort('Mã THU')}>
+                                            Mã Thu {getSortIcon('Mã THU')}
                                         </th>
                                         <th scope="col"
                                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                            onClick={() => requestSort('Ngày giải ngân')}>
-                                            Ngày GN {getSortIcon('Ngày giải ngân')}
+                                            onClick={() => requestSort('Thời gian')}>
+                                            Thời gian {getSortIcon('Thời gian')}
                                         </th>
                                         <th scope="col"
                                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                            onClick={() => requestSort('SỐ TIỀN')}>
-                                            Số Tiền {getSortIcon('SỐ TIỀN')}
+                                            onClick={() => requestSort('Số tiền')}>
+                                            Số Tiền {getSortIcon('Số tiền')}
                                         </th>
                                         <th scope="col"
                                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                            onClick={() => requestSort('NỘI DUNG')}>
-                                            Nội Dung {getSortIcon('NỘI DUNG')}
+                                            onClick={() => requestSort('Nội dung')}>
+                                            Nội Dung {getSortIcon('Nội dung')}
                                         </th>
                                         <th scope="col"
                                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
@@ -1148,25 +1143,25 @@ const ChiPhiStatistics = () => {
                                         </th>
                                         <th scope="col"
                                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                            onClick={() => requestSort('ĐỐI TƯỢNG')}>
-                                            Đối Tượng {getSortIcon('ĐỐI TƯỢNG')}
+                                            onClick={() => requestSort('Tài khoản thu')}>
+                                            TK Thu {getSortIcon('Tài khoản thu')}
                                         </th>
                                         <th scope="col"
                                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                            onClick={() => requestSort('TRẠNG THÁI')}>
-                                            Trạng Thái {getSortIcon('TRẠNG THÁI')}
+                                            onClick={() => requestSort('Tài khoản chi')}>
+                                            TK Chi {getSortIcon('Tài khoản chi')}
                                         </th>
                                         <th scope="col"
                                             className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer"
-                                            onClick={() => requestSort('TKCHI')}>
-                                            TK Chi {getSortIcon('TKCHI')}
+                                            onClick={() => requestSort('Ghi chú')}>
+                                            Ghi chú {getSortIcon('Ghi chú')}
                                         </th>
                                     </tr>
                                 </thead>
                                 <tbody className="bg-white divide-y divide-gray-200">
                                     {loading ? (
                                         <tr>
-                                            <td colSpan="12" className="px-4 py-4 text-center">
+                                            <td colSpan="11" className="px-4 py-4 text-center">
                                                 <div className="flex items-center justify-center">
                                                     <svg className="animate-spin h-6 w-6 text-indigo-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                                                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -1177,56 +1172,47 @@ const ChiPhiStatistics = () => {
                                             </td>
                                         </tr>
                                     ) : currentItems.length > 0 ? (
-                                        currentItems.map((chi, index) => (
+                                        currentItems.map((thu, index) => (
                                             <tr key={index} className="hover:bg-gray-50 transition-colors">
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                    {chi['Mã chuyển khoản']}
-                                                </td>
-
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {chi['KHU VỰC'] || '—'}
+                                                    {thu['IDTHU']}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {chi['Dự án'] || '—'}
+                                                    {thu['KHU VỰC'] || '—'}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {chi['Mã CHI'] || '—'}
+                                                    {thu['Dự án'] || '—'}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {formatDate(chi['Ngày giải ngân'])}
+                                                    {thu['Mã THU'] || '—'}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {formatDate(thu['Thời gian'])}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                                                    {formatCurrency(chi['SỐ TIỀN'])}
+                                                    {formatCurrency(thu['Số tiền'])}
                                                 </td>
                                                 <td className="px-4 py-4 text-sm text-gray-700">
-                                                    {chi['NỘI DUNG'] || '—'}
+                                                    {thu['Nội dung'] || '—'}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {chi['NHÂN VIÊN THỰC HIỆN'] || '—'}
+                                                    {thu['NHÂN VIÊN THỰC HIỆN'] || '—'}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {chi['ĐỐI TƯỢNG'] || '—'}
-                                                </td>
-                                                <td className="px-4 py-4 whitespace-nowrap text-sm">
-                                                    <span className={`px-2 py-1 rounded-full text-xs font-medium 
-                                                            ${chi['TRẠNG THÁI'] === 'Đã giải ngân'
-                                                            ? 'bg-green-100 text-green-800'
-                                                            : chi['TRẠNG THÁI'] === 'Đang xử lý'
-                                                                ? 'bg-yellow-100 text-yellow-800'
-                                                                : 'bg-gray-100 text-gray-800'
-                                                        }`}>
-                                                        {chi['TRẠNG THÁI'] || 'Chưa xác định'}
-                                                    </span>
+                                                    {thu['Tài khoản thu'] || '—'}
                                                 </td>
                                                 <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
-                                                    {chi['TKCHI'] || '—'}
+                                                    {thu['Tài khoản chi'] || '—'}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-700">
+                                                    {thu['Ghi chú'] || '—'}
                                                 </td>
                                             </tr>
                                         ))
                                     ) : (
                                         <tr>
-                                            <td colSpan="12" className="px-4 py-6 text-center text-sm text-gray-500">
-                                                Không tìm thấy phiếu chi nào phù hợp với tiêu chí tìm kiếm
+                                            <td colSpan="11" className="px-4 py-6 text-center text-sm text-gray-500">
+                                                Không tìm thấy phiếu thu nào phù hợp với tiêu chí tìm kiếm
                                             </td>
                                         </tr>
                                     )}
@@ -1258,4 +1244,4 @@ const ChiPhiStatistics = () => {
     );
 };
 
-export default ChiPhiStatistics;
+export default ThuPhiStatistics;

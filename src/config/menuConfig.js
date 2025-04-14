@@ -103,6 +103,17 @@ const menuConfig = [
                     PhanQuyen: ["Admin"],
                     Phong: ["Giám đốc"],
                 }
+            }, 
+            {
+                text: 'Thu nhập',
+                icon: Wallet,
+                path: '/thunhap',
+                description: 'Thu nhập',
+                showInSidebar: true, // Hiện trên sidebar
+                permissions: {
+                    PhanQuyen: ["Admin"],
+                    Phong: ["Giám đốc"],
+                }
             }
         ]
     },

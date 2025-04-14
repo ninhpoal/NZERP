@@ -13,6 +13,7 @@ import DuAnStatistics from './pages/DuanToiuu';
 import AddDuan from './pages/AddDuan';
 import DanhSachKeHoach from './pages/DanhSachKeHoach';
 import ChiPhiStatistics from './pages/ChiPhiStatistics';
+import ThuPhiStatistics from './pages/ThuPhiStatistics';
 import { checkPermission } from './config/menuConfig';
 
 // Protected Route Component
@@ -133,6 +134,14 @@ function App() {
                     <ChiPhiStatistics />
                     </RoleProtectedRoute>
                   } />
+
+                  {/* Trang quản lý thu chi */}
+                  <Route path="/thunhap" element={
+                    <RoleProtectedRoute requiredPermissions={routePermissions.thuchi}>
+                    <ThuPhiStatistics />
+                    </RoleProtectedRoute>
+                  } />
+
 
                   {/* Trang chấm công */}
                   <Route path="/Chamcong" element={

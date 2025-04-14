@@ -519,8 +519,8 @@ const MainLayout = ({ children }) => {
                 </header>
 
                 {/* Main Content */}
-                <main className={`mt-16 ${pageActions.length > 0 ? 'pt-12' : 'pt-0'}`}>
-                    <div className="p-5">
+                <main className={`mt-14 ${pageActions.length > 0 ? 'pt-10' : 'pt-0'}`}>
+                    <div className="p-2">
                         {children}
                     </div>
                 </main>
