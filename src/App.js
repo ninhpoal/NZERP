@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useLocation, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 import LoginPage from './pages/LoginPage';
@@ -9,9 +9,12 @@ import Profile from './pages/Profile';
 import Users from './pages/UserManagement';
 import MenuStructurePage from './pages/MenuStructurePage';
 import AttendanceSystem from './pages/AttendanceSystem';
-import DuAnStatistics from './pages/DuAnStatistics';
+import DuAnStatistics from './pages/DuanToiuu';
 import AddDuan from './pages/AddDuan';
 import DanhSachKeHoach from './pages/DanhSachKeHoach';
+import ChiPhiStatistics from './pages/ChiPhiStatistics';
+import { checkPermission } from './config/menuConfig';
+
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
@@ -25,7 +28,7 @@ const ProtectedRoute = ({ children }) => {
 };
 
 // Role-based Protected Route
-const RoleProtectedRoute = ({ requiredRoles, requiredDepartments, requiredPositions, allowAll, children }) => {
+const RoleProtectedRoute = ({ children, requiredPermissions }) => {
   const location = useLocation();
   const userData = authUtils.getUserData();
 
@@ -34,35 +37,9 @@ const RoleProtectedRoute = ({ requiredRoles, requiredDepartments, requiredPositi
     return <Navigate to="/" replace />;
   }
 
-  // Nếu allowAll là true, cho phép tất cả người dùng đã xác thực truy cập
-  if (allowAll) {
+  // Kiểm tra nếu có quyền truy cập
+  if (checkPermission(requiredPermissions, userData)) {
     return children;
-  }
-
-  // Admin luôn có quyền truy cập
-  if (userData?.['Phân quyền'] === 'ADMIN') {
-    return children;
-  }
-
-  // Kiểm tra role
-  if (requiredRoles && requiredRoles.length > 0) {
-    if (requiredRoles.includes(userData?.['Phân quyền'])) {
-      return children;
-    }
-  }
-
-  // Kiểm tra phòng ban
-  if (requiredDepartments && requiredDepartments.length > 0) {
-    if (requiredDepartments.includes(userData?.['Phòng']) || requiredDepartments.includes('ALL')) {
-      return children;
-    }
-  }
-
-  // Kiểm tra chức vụ
-  if (requiredPositions && requiredPositions.length > 0) {
-    if (requiredPositions.includes(userData?.['Chức vụ']) || requiredPositions.includes('ALL')) {
-      return children;
-    }
   }
 
   // Nếu không có quyền truy cập, chuyển hướng đến trang 403 (Forbidden)
@@ -75,7 +52,7 @@ const NotFound = () => (
     <h1 className="text-6xl font-bold text-[#04319a]">404</h1>
     <p className="text-xl text-gray-600 mt-4">Trang không tồn tại</p>
     <button
-      onClick={() => window.location.href = '/dashboard'}
+      onClick={() => window.location.href = '/Home'}
       className="mt-6 px-6 py-2 bg-[#04319a] text-white rounded-lg hover:bg-[#4169E1] transition-colors"
     >
       Quay lại trang chủ
@@ -98,6 +75,18 @@ const Forbidden = () => (
 );
 
 function App() {
+  // Định nghĩa quyền truy cập cho từng route
+  const routePermissions = {
+    Home: { PhanQuyen: ["All"] }, // Tất cả đều xem được
+    profile: { PhanQuyen: ["All"] }, // Tất cả đều xem được
+    users: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },
+    addduan: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },
+    thuchi: { PhanQuyen: ["Admin"], Phong: ["Giám đốc"], ChucVu: ["Kế toán"] },
+    Chamcong: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },
+    duankho: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },
+    Duantc: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] }
+  };
+
   return (
     <BrowserRouter>
       <ToastContainer position="top-right" />
@@ -110,72 +99,58 @@ function App() {
             <ProtectedRoute>
               <MainLayout>
                 <Routes>
-
-                  {/* Trang Menu - Chỉ ADMIN và Giám đốc, Trưởng phòng mới xem được */}
+                  {/* Trang Menu - Tất cả đều xem được sau khi đăng nhập */}
                   <Route path="/Home" element={
-                    <RoleProtectedRoute
-
-                      allowAll={true}
-                    >
+                    <RoleProtectedRoute requiredPermissions={routePermissions.Home}>
                       <MenuStructurePage />
                     </RoleProtectedRoute>
                   } />
 
                   {/* Trang profile - Ai cũng xem được sau khi đăng nhập */}
                   <Route path="/profile" element={
-                    <RoleProtectedRoute allowAll={true}>
+                    <RoleProtectedRoute requiredPermissions={routePermissions.profile}>
                       <Profile />
                     </RoleProtectedRoute>
                   } />
 
-                  {/* Trang quản lý người dùng - Chỉ ADMIN mới xem được */}
+                  {/* Trang quản lý người dùng */}
                   <Route path="/users" element={
-                    <RoleProtectedRoute requiredRoles={["Admin"]}
-                      requiredDepartments={["Hành chánh", "Giám đốc"]}>
-
+                    <RoleProtectedRoute requiredPermissions={routePermissions.users}>
                       <Users />
                     </RoleProtectedRoute>
                   } />
-                   <Route path="/addduan" element={
-                    <RoleProtectedRoute requiredRoles={["Admin"]}
-                      requiredDepartments={["Hành chánh", "Giám đốc"]}>
 
+                  {/* Trang thêm dự án */}
+                  <Route path="/addduan" element={
+                    <RoleProtectedRoute requiredPermissions={routePermissions.addduan}>
                       <AddDuan />
                     </RoleProtectedRoute>
                   } />
 
-                  {/* Trang quản lý thu chi - Chỉ ADMIN, Kế toán, Giám đốc mới xem được */}
-                  <Route path="/thuchi" element={
-                    <RoleProtectedRoute
-                      requiredRoles={["Admin"]}
-                      requiredDepartments={["Giám đốc"]}
-                      requiredPositions={["Kế toán"]}
-                    >
-                      {/* Thay bằng component thực tế */}
-                      <div>Trang quản lý thu chi</div>
+                  {/* Trang quản lý thu chi */}
+                  <Route path="/chiphi" element={
+                    <RoleProtectedRoute requiredPermissions={routePermissions.thuchi}>
+                    <ChiPhiStatistics />
                     </RoleProtectedRoute>
                   } />
-                  {/* Trang quản lý người dùng - Chỉ ADMIN mới xem được */}
-                  <Route path="/Chamcong" element={
-                    <RoleProtectedRoute requiredRoles={["Admin"]}
-                      requiredDepartments={["Hành chánh", "Giám đốc"]}>
 
+                  {/* Trang chấm công */}
+                  <Route path="/Chamcong" element={
+                    <RoleProtectedRoute requiredPermissions={routePermissions.Chamcong}>
                       <AttendanceSystem />
                     </RoleProtectedRoute>
                   } />
-                    {/* Trang quản lý người dùng - Chỉ ADMIN mới xem được */}
-                    <Route path="/duankho" element={
-                    <RoleProtectedRoute requiredRoles={["Admin"]}
-                      requiredDepartments={["Hành chánh", "Giám đốc"]}>
 
+                  {/* Trang dự án kho */}
+                  <Route path="/duankho" element={
+                    <RoleProtectedRoute requiredPermissions={routePermissions.duankho}>
                       <DanhSachKeHoach />
                     </RoleProtectedRoute>
                   } />
-                     {/* Trang quản lý người dùng - Chỉ ADMIN mới xem được */}
-                     <Route path="/Duantc" element={
-                    <RoleProtectedRoute requiredRoles={["Admin"]}
-                      requiredDepartments={["Hành chánh", "Giám đốc"]}>
 
+                  {/* Trang dự án thống kê */}
+                  <Route path="/Duantc" element={
+                    <RoleProtectedRoute requiredPermissions={routePermissions.Duantc}>
                       <DuAnStatistics />
                     </RoleProtectedRoute>
                   } />

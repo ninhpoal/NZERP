@@ -1,78 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
-    FileBox,
-    User,
-    Gauge, IdCard, BriefcaseBusiness, FileBadge2, Wallet,
     ChevronLeft,
-    ChartPie,
     LogOut,
-    Menu as MenuIcon,
-    Warehouse,
-    Truck,
-    ClipboardList,
-    Settings,
+    MenuIcon,
     Bell,
-    Search,
-    HelpCircle,
-    Home,
     ChevronDown,
-    ChevronRight,
-    Mail,
-    Phone,
     Calendar,
     Clock,
     Shield,
-    Globe
+    BriefcaseBusiness,
+    User,
+    HelpCircle,
 } from 'lucide-react';
 import authUtils from '../utils/authUtils';
+import { getSidebarMenu, checkPermission } from '../config/menuConfig';
+
 
 const isMobileDevice = () => {
     return window.innerWidth <= 768 || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-};
-
-// Hàm kiểm tra quyền truy cập cho menu item
-export const hasPermission = (item, userData) => {
-    // Nếu không có thông tin phân quyền trong menu hoặc item đó cho phép tất cả
-    if (!item.permissions || item.permissions.all === true) {
-        return true;
-    }
-
-    // Nếu là ADMIN, luôn được quyền truy cập
-    if (userData?.['Phân quyền'] === 'Admin') {
-        return true;
-    }
-
-    // Kiểm tra quyền dựa trên phân quyền (ADMIN/USER)
-    if (item.permissions.roles && item.permissions.roles.includes(userData?.['Phân quyền'])) {
-        return true;
-    }
-
-    // Kiểm tra quyền dựa trên phòng ban
-    if (item.permissions.departments) {
-        if (item.permissions.departments.includes(userData?.['Phòng']) ||
-            item.permissions.departments.includes('ALL')) {
-            return true;
-        }
-    }
-
-    // Kiểm tra quyền dựa trên chức vụ
-    if (item.permissions.positions) {
-        if (item.permissions.positions.includes(userData?.['Chức vụ']) ||
-            item.permissions.positions.includes('ALL')) {
-            return true;
-        }
-    }
-
-    // Kiểm tra quyền dựa trên khu vực
-    if (item.permissions.areas) {
-        if (item.permissions.areas.includes(userData?.['Khu vực']) ||
-            item.permissions.areas.includes('ALL')) {
-            return true;
-        }
-    }
-
-    return false;
 };
 
 const MainLayout = ({ children }) => {
@@ -90,6 +36,8 @@ const MainLayout = ({ children }) => {
     const [pageActions, setPageActions] = useState([]);
 
     const userData = authUtils.getUserData();
+    const menuItems = getSidebarMenu();
+
 
     // Add resize listener
     useEffect(() => {
@@ -140,39 +88,6 @@ const MainLayout = ({ children }) => {
         return () => document.removeEventListener('mousedown', handleClickOutside);
     }, [isProfileMenuOpen, isNotificationsOpen]);
 
-    // All menu items in a flat structure (no groups)
-    const menuItems = [
-        {
-            text: 'Trang chủ',
-            icon: Home,
-            path: '/Home',
-            description: 'Tổng hợp chức năng',
-            permissions: { all: true } // Everyone can see Home
-        },
-        {
-            text: 'Thu chi',
-            icon: Wallet,
-            path: '/thuchi',
-            description: 'Quản lý thu chi',
-            permissions: {
-                roles: ["Admin"],
-                departments: ["Giám đốc", "Tài chính"],
-                positions: ["Kế toán"]
-            }
-        },
-        {
-            text: 'Quản lý người dùng',
-            icon: User,
-            path: '/users',
-            description: 'Quản lý người dùng',
-            permissions: {
-                roles: ["Admin"],
-                departments: ["Giám đốc", "Hành chánh"],
-                positions: ["Kế toán"]
-            }
-        }
-    ];
-
     const handleLogout = () => {
         authUtils.logout();
         navigate('/');
@@ -182,7 +97,7 @@ const MainLayout = ({ children }) => {
         setIsSidebarOpen(!isSidebarOpen);
     };
 
-    const userInitial = userData?.username?.[0]?.toUpperCase() || '?';
+    const userInitial = userData?.username?.[0]?.toUpperCase() || userData?.['Họ và Tên']?.[0]?.toUpperCase() || '?';
 
     // Sample notifications for demo
     const notifications = [
@@ -269,7 +184,7 @@ const MainLayout = ({ children }) => {
             <nav className={`flex-1 py-3 space-y-1 overflow-y-auto ${isSidebarOpen ? 'px-3' : 'px-2'}`}>
                 {/* Render all menu items in a flat structure */}
                 {menuItems
-                    .filter(item => hasPermission(item, userData))
+                    .filter(item => checkPermission(item, userData))
                     .map((item, index) => {
                         const Icon = item.icon;
                         const isItemActive = location.pathname === item.path;
@@ -397,7 +312,6 @@ const MainLayout = ({ children }) => {
                                 )}
                             </div>
                         </div>
-
 
                         {/* Right - Notifications & User Menu */}
                         <div className="flex items-center space-x-1">
@@ -550,7 +464,16 @@ const MainLayout = ({ children }) => {
                                                 <User className="h-4 w-4 text-gray-500" />
                                                 <span>Thông tin cá nhân</span>
                                             </button>
-
+                                            <button
+                                                onClick={() => {
+                                                    navigate('/support');
+                                                    setIsProfileMenuOpen(false);
+                                                }}
+                                                className="w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-[#002266]/5 flex items-center space-x-2"
+                                            >
+                                                <HelpCircle className="h-4 w-4 text-gray-500" />
+                                                <span>Trợ giúp</span>
+                                            </button>
                                         </div>
 
                                         <div className="border-t my-1"></div>

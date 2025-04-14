@@ -24,6 +24,29 @@ class AuthUtils {
             throw error;
         }
     }
+    async apiRequestThuChi(tableName, action, data, select = {}) {
+        const apiUrl = `https://www.appsheet.com/api/v2/apps/1a8d9270-a4ff-46b8-94fc-db1e4632f273/tables/${tableName}/Action`;
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'ApplicationAccessKey': 'V2-IEkJl-GKXgi-aBjtl-fN3Ur-QQSYX-Ggn6e-m9pkA-GtxEU',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    Action: action,
+
+                    select,
+                    ...data
+                })
+            });
+            if (!response.ok) throw new Error('Network response was not ok');
+            return await response.json();
+        } catch (error) {
+            console.error('API request failed:', error);
+            throw error;
+        }
+    }
     async apiRequestErp(tableName, action, Properties = {}, data) {
         const apiUrl = `https://www.appsheet.com/api/v2/apps/509dd5b5-bc8b-4962-8122-bbc6d3cf3f55/tables/${tableName}/Action`;
         try {
