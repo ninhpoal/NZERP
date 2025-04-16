@@ -1,18 +1,28 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import JSZip from 'jszip';
 import { saveAs } from 'file-saver';
 import { createWorker } from 'tesseract.js';
-
 
 const ImageSlicer = () => {
     const [files, setFiles] = useState([]);
     const [dragOver, setDragOver] = useState(false);
     const [customNames, setCustomNames] = useState({});
     const [zipName, setZipName] = useState('hinh_anh_cua_toi');
+    const [filePrefix, setFilePrefix] = useState('');
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
     const [ocrProgress, setOcrProgress] = useState(0);
     const fileInputRef = useRef(null);
+    const nameInputRefs = useRef({});
+
+    // Create refs for all filename inputs
+    useEffect(() => {
+        files.forEach(fileObj => {
+            if (!nameInputRefs.current[fileObj.id]) {
+                nameInputRefs.current[fileObj.id] = React.createRef();
+            }
+        });
+    }, [files]);
 
     const handleDrop = (e) => {
         e.preventDefault();
@@ -55,11 +65,10 @@ const ImageSlicer = () => {
             return updatedFiles;
         });
 
+        // Initialize with empty names instead of base filenames
         const newCustomNames = { ...customNames };
         filesWithPreview.forEach((fileObj) => {
-            const fileName = fileObj.file.name;
-            const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
-            newCustomNames[fileObj.id] = baseName;
+            newCustomNames[fileObj.id] = '';
         });
 
         setCustomNames(newCustomNames);
@@ -70,7 +79,6 @@ const ImageSlicer = () => {
         setOcrProgress(0);
 
         try {
-            // Tạo worker với hàm callback cho tiến trình
             const worker = await createWorker({
                 logger: progress => {
                     if (progress.status === 'recognizing text') {
@@ -79,7 +87,6 @@ const ImageSlicer = () => {
                 }
             });
 
-            // Trong v4.x, loadLanguage và initialize được kết hợp trong một hàm
             await worker.load();
             await worker.loadLanguage('vie+eng');
             await worker.initialize('vie+eng');
@@ -87,10 +94,8 @@ const ImageSlicer = () => {
             const { data } = await worker.recognize(fileObj.previewUrl);
             const text = data.text;
 
-            // Giải phóng tài nguyên worker khi hoàn thành
             await worker.terminate();
 
-            // Xử lý văn bản như trước
             let extractedName = text.split('\n')[0] || text;
             extractedName = extractedName.trim();
 
@@ -116,6 +121,7 @@ const ImageSlicer = () => {
             setOcrProgress(0);
         }
     };
+
     const processCurrentImageWithOCR = async () => {
         if (!currentFile) return;
 
@@ -160,6 +166,9 @@ const ImageSlicer = () => {
         delete updatedNames[fileObj.id];
         setCustomNames(updatedNames);
 
+        // Also clean up the ref
+        delete nameInputRefs.current[fileObj.id];
+
         if (files.length <= 1) {
             setCurrentIndex(0);
         } else if (currentIndex >= files.length - 1) {
@@ -177,9 +186,14 @@ const ImageSlicer = () => {
 
         for (const fileObj of files) {
             const file = fileObj.file;
-            const customName = customNames[fileObj.id] || file.name;
+            const customName = customNames[fileObj.id] || '';
             const ext = file.name.split('.').pop();
-            const finalFileName = `${customName}.${ext}`;
+            
+            // Add prefix to custom name
+            const finalFileName = customName 
+                ? `${filePrefix ? filePrefix + '_' : ''}${customName}.${ext}`
+                : `${filePrefix ? filePrefix + '_' : ''}image_${fileObj.id.substring(0, 8)}.${ext}`;
+                
             const fileData = await file.arrayBuffer();
             zip.file(finalFileName, fileData);
         }
@@ -196,6 +210,7 @@ const ImageSlicer = () => {
         setFiles([]);
         setCustomNames({});
         setCurrentIndex(0);
+        nameInputRefs.current = {};
     };
 
     const goToNextImage = () => {
@@ -207,6 +222,39 @@ const ImageSlicer = () => {
     const goToPrevImage = () => {
         if (currentIndex > 0) {
             setCurrentIndex(currentIndex - 1);
+        }
+    };
+
+    // Handle tab navigation between images
+    const handleKeyDown = (e, index) => {
+        if (isProcessing) return;
+
+        if (e.key === 'Tab') {
+            e.preventDefault();
+            
+            if (e.shiftKey) {
+                // Shift+Tab: go to previous image
+                if (index > 0) {
+                    setCurrentIndex(index - 1);
+                    setTimeout(() => {
+                        const prevFileId = files[index - 1].id;
+                        if (nameInputRefs.current[prevFileId] && nameInputRefs.current[prevFileId].current) {
+                            nameInputRefs.current[prevFileId].current.focus();
+                        }
+                    }, 50);
+                }
+            } else {
+                // Tab: go to next image
+                if (index < files.length - 1) {
+                    setCurrentIndex(index + 1);
+                    setTimeout(() => {
+                        const nextFileId = files[index + 1].id;
+                        if (nameInputRefs.current[nextFileId] && nameInputRefs.current[nextFileId].current) {
+                            nameInputRefs.current[nextFileId].current.focus();
+                        }
+                    }, 50);
+                }
+            }
         }
     };
 
@@ -230,19 +278,50 @@ const ImageSlicer = () => {
             <div className="bg-white rounded-xl shadow-xl p-6 border border-gray-100">
                 <h1 className="text-3xl font-bold text-center mb-6 text-indigo-700">Bộ xử lý ảnh với OCR</h1>
 
-                {/* ZIP name input */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tên file ZIP:
-                    </label>
-                    <input
-                        type="text"
-                        value={zipName}
-                        onChange={(e) => setZipName(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                        placeholder="Nhập tên cho file ZIP"
-                    />
+                {/* File naming settings */}
+                <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* ZIP name input */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Tên file ZIP:
+                        </label>
+                        <input
+                            type="text"
+                            value={zipName}
+                            onChange={(e) => setZipName(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            placeholder="Nhập tên cho file ZIP"
+                        />
+                    </div>
+                    
+                    {/* File prefix input */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Tiền tố cho tên file:
+                        </label>
+                        <input
+                            type="text"
+                            value={filePrefix}
+                            onChange={(e) => setFilePrefix(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            placeholder="Ví dụ: tento"
+                        />
+                    </div>
                 </div>
+
+                {files.length > 0 && (
+                    <div className="mb-4 bg-blue-50 p-3 rounded-lg border border-blue-100">
+                        <p className="text-blue-800 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                            <span>
+                                <strong>Mẹo:</strong> Nhấn <kbd className="bg-blue-100 px-1 py-0.5 rounded mx-1">Tab</kbd> để chuyển sang hình tiếp theo, 
+                                <kbd className="bg-blue-100 px-1 py-0.5 rounded mx-1">Shift+Tab</kbd> để quay lại hình trước.
+                            </span>
+                        </p>
+                    </div>
+                )}
 
                 {/* Main content */}
                 <div className="flex flex-col lg:flex-row gap-6">
@@ -356,15 +435,23 @@ const ImageSlicer = () => {
 
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Đặt tên cho hình ảnh:
+                                        Tên cho hình ảnh (không gồm tiền tố và đuôi file):
                                     </label>
                                     <input
+                                        ref={nameInputRefs.current[currentFile.id]}
                                         type="text"
                                         value={customNames[currentFile.id] || ''}
                                         onChange={(e) => handleCustomNameChange(currentFile.id, e.target.value)}
+                                        onKeyDown={(e) => handleKeyDown(e, currentIndex)}
                                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                         placeholder="Nhập tên cho hình ảnh"
+                                        autoFocus={currentIndex === 0}
                                     />
+                                    {filePrefix && (
+                                        <p className="mt-2 text-sm text-gray-600">
+                                            Tên file sẽ là: <span className="font-medium">{filePrefix}_{customNames[currentFile.id] || '[tên file]'}.{currentFile.file.name.split('.').pop()}</span>
+                                        </p>
+                                    )}
                                 </div>
 
                                 {/* Nút OCR cho hình ảnh hiện tại */}
@@ -477,6 +564,7 @@ const ImageSlicer = () => {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                                 </svg>
                                 Tải xuống dưới dạng ZIP
+                           
                             </button>
 
                             <button
