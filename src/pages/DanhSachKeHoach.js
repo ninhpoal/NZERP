@@ -140,7 +140,7 @@ const DanhSachKeHoach = () => {
 
     return (
         <div className="bg-white p-4 rounded-lg shadow">
-            <ToastContainer position="top-right" autoClose={3000} hideProgressBar={false} />
+            <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar={false} />
 
             {/* Header với tiêu đề và nút làm mới */}
             <div className="flex justify-between items-center mb-4">

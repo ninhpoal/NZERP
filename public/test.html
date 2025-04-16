@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="vi">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trích xuất Text từ vùng ảnh</title>
+    <script src="https://unpkg.com/tesseract.js@v2.1.0/dist/tesseract.min.js"></script>
+    <style>
+        #container {
+            position: relative;
+            width: 400px;
+            height: 500px;
+            border: 2px solid #000;
+            overflow: hidden;
+        }
+
+        #imageDisplay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        #selectionArea {
+            position: absolute;
+            border: 2px dashed red;
+            background-color: rgba(255, 0, 0, 0.2);
+            cursor: move;
+        }
+
+        #controls {
+            margin-top: 20px;
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ccc;
+            min-height: 500px;
+        }
+    </style>
+</head>
+
+<body>
+    <h1>Trích xuất Text từ vùng ảnh</h1>
+
+    <input type="file" id="imageInput" accept="image/*">
+
+    <div id="container">
+        <img id="imageDisplay" alt="Hình ảnh được tải lên">
+        <div id="selectionArea"></div>
+    </div>
+
+    <div id="controls">
+        <button id="extractBtn" disabled>Trích xuất Text</button>
+    </div>
+
+    <div id="result">
+        <p>Kết quả trích xuất sẽ hiển thị ở đây...</p>
+    </div>
+
+    <script>
+        const imageInput = document.getElementById('imageInput');
+        const imageDisplay = document.getElementById('imageDisplay');
+        const container = document.getElementById('container');
+        const selectionArea = document.getElementById('selectionArea');
+        const extractBtn = document.getElementById('extractBtn');
+        const resultDiv = document.getElementById('result');
+
+        // Kích thước mặc định cho vùng chọn
+        const defaultSelection = {
+            x: 10,
+            y: 470,
+            width: 130,
+            height: 30
+        };
+
+        // Áp dụng kích thước mặc định
+        selectionArea.style.left = defaultSelection.x + 'px';
+        selectionArea.style.top = defaultSelection.y + 'px';
+        selectionArea.style.width = defaultSelection.width + 'px';
+        selectionArea.style.height = defaultSelection.height + 'px';
+
+        // Biến lưu trữ vị trí khi kéo
+        let isDragging = false;
+        let startX, startY;
+        let currentX = defaultSelection.x;
+        let currentY = defaultSelection.y;
+
+        // Xử lý khi người dùng tải ảnh lên
+        imageInput.addEventListener('change', function (e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function (event) {
+                    imageDisplay.src = event.target.result;
+                    extractBtn.disabled = false;
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Xử lý sự kiện di chuyển vùng chọn
+        selectionArea.addEventListener('mousedown', function (e) {
+            isDragging = true;
+            startX = e.clientX - currentX;
+            startY = e.clientY - currentY;
+            selectionArea.style.cursor = 'grabbing';
+        });
+
+        document.addEventListener('mousemove', function (e) {
+            if (!isDragging) return;
+
+            currentX = e.clientX - startX;
+            currentY = e.clientY - startY;
+
+            // Giới hạn trong container
+            currentX = Math.max(0, Math.min(currentX, container.offsetWidth - selectionArea.offsetWidth));
+            currentY = Math.max(0, Math.min(currentY, container.offsetHeight - selectionArea.offsetHeight));
+
+            selectionArea.style.left = currentX + 'px';
+            selectionArea.style.top = currentY + 'px';
+        });
+
+        document.addEventListener('mouseup', function () {
+            isDragging = false;
+            selectionArea.style.cursor = 'move';
+        });
+
+        // Trích xuất text từ vùng đã chọn
+        extractBtn.addEventListener('click', function () {
+            resultDiv.innerHTML = '<p>Đang trích xuất text, vui lòng đợi...</p>';
+
+            // Tạo canvas để vẽ vùng được chọn
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+
+            // Lấy kích thước thực của vùng chọn
+            const selectionWidth = selectionArea.offsetWidth;
+            const selectionHeight = selectionArea.offsetHeight;
+
+            // Đặt kích thước canvas bằng đúng kích thước vùng chọn
+            canvas.width = selectionWidth;
+            canvas.height = selectionHeight;
+
+            // Lấy tỷ lệ thực tế của hình ảnh
+            const imageRatio = {
+                width: imageDisplay.naturalWidth / imageDisplay.width,
+                height: imageDisplay.naturalHeight / imageDisplay.height
+            };
+
+            // Tính toán vị trí chính xác trên hình ảnh gốc
+            const sourceX = selectionArea.offsetLeft * imageRatio.width;
+            const sourceY = selectionArea.offsetTop * imageRatio.height;
+            const sourceWidth = selectionWidth * imageRatio.width;
+            const sourceHeight = selectionHeight * imageRatio.height;
+
+            // Vẽ chỉ vùng được chọn vào canvas
+            ctx.drawImage(
+                imageDisplay,
+                sourceX, sourceY,
+                sourceWidth, sourceHeight,
+                0, 0,
+                canvas.width, canvas.height
+            );
+
+            // Debug - hiển thị canvas để kiểm tra (có thể xóa sau)
+            // document.body.appendChild(canvas);
+            // canvas.style.border = '1px solid blue';
+            // canvas.style.marginTop = '10px';
+
+            // Sử dụng Tesseract.js để trích xuất text
+            Tesseract.recognize(
+                canvas.toDataURL(),
+                'eng', // Ngôn ngữ Tiếng Việt và Tiếng Anh
+                { logger: m => console.log(m) }
+            ).then(({ data: { text } }) => {
+                resultDiv.innerHTML = '<h3>Kết quả trích xuất:</h3>';
+                resultDiv.innerHTML += '<pre>' + text + '</pre>';
+            }).catch(err => {
+                resultDiv.innerHTML = '<p>Lỗi khi trích xuất text: ' + err.message + '</p>';
+            });
+        });
+        // Cho phép điều chỉnh kích thước vùng chọn (tùy chọn thêm)
+        function addResizeHandles() {
+            const handles = ['nw', 'ne', 'sw', 'se', 'n', 's', 'e', 'w'];
+            handles.forEach(handle => {
+                const div = document.createElement('div');
+                div.className = 'resize-handle ' + handle;
+                div.style.position = 'absolute';
+                div.style.width = '10px';
+                div.style.height = '10px';
+                div.style.backgroundColor = 'white';
+                div.style.border = '1px solid black';
+
+                switch (handle) {
+                    case 'nw': div.style.top = '-5px'; div.style.left = '-5px'; div.style.cursor = 'nwse-resize'; break;
+                    case 'ne': div.style.top = '-5px'; div.style.right = '-5px'; div.style.cursor = 'nesw-resize'; break;
+                    case 'sw': div.style.bottom = '-5px'; div.style.left = '-5px'; div.style.cursor = 'nesw-resize'; break;
+                    case 'se': div.style.bottom = '-5px'; div.style.right = '-5px'; div.style.cursor = 'nwse-resize'; break;
+                    case 'n': div.style.top = '-5px'; div.style.left = 'calc(50% - 5px)'; div.style.cursor = 'ns-resize'; break;
+                    case 's': div.style.bottom = '-5px'; div.style.left = 'calc(50% - 5px)'; div.style.cursor = 'ns-resize'; break;
+                    case 'e': div.style.right = '-5px'; div.style.top = 'calc(50% - 5px)'; div.style.cursor = 'ew-resize'; break;
+                    case 'w': div.style.left = '-5px'; div.style.top = 'calc(50% - 5px)'; div.style.cursor = 'ew-resize'; break;
+                }
+
+                selectionArea.appendChild(div);
+            });
+        }
+
+        // Thêm điểm điều chỉnh kích thước (có thể bỏ comment nếu muốn kích hoạt)
+        // addResizeHandles();
+    </script>
+</body>
+
+</html>

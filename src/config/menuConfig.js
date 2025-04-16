@@ -170,6 +170,17 @@ const menuConfig = [
                     Phong: ["Hành chánh", "Giám đốc"],
                 }
             },
+            {
+                text: 'Đổi tên hình ảnh',
+                icon: Edit,
+                path: '/toolupanh',
+                description: 'đổi tên hình nhanh',
+                showInSidebar: true, // Hiện trên sidebar
+                permissions: {
+                    PhanQuyen: ["Admin"],
+                    Phong: ["Hành chánh", "Giám đốc"],
+                }
+            },
         ]
     },
     {

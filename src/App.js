@@ -15,7 +15,7 @@ import DanhSachKeHoach from './pages/DanhSachKeHoach';
 import ChiPhiStatistics from './pages/ChiPhiStatistics';
 import ThuPhiStatistics from './pages/ThuPhiStatistics';
 import { checkPermission } from './config/menuConfig';
-
+import ToolUpanh from './pages/toolupanh';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
@@ -79,6 +79,7 @@ function App() {
   // Định nghĩa quyền truy cập cho từng route
   const routePermissions = {
     Home: { PhanQuyen: ["All"] }, // Tất cả đều xem được
+    Tool: { PhanQuyen: ["All"] },
     profile: { PhanQuyen: ["All"] }, // Tất cả đều xem được
     users: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },
     addduan: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },
@@ -125,6 +126,12 @@ function App() {
                   <Route path="/addduan" element={
                     <RoleProtectedRoute requiredPermissions={routePermissions.addduan}>
                       <AddDuan />
+                    </RoleProtectedRoute>
+                  } />
+                   {/* Trang thêm dự án */}
+                   <Route path="/toolupanh" element={
+                    <RoleProtectedRoute requiredPermissions={routePermissions.Tool}>
+                      <ToolUpanh />
                     </RoleProtectedRoute>
                   } />
 
