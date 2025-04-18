@@ -1,5 +1,4 @@
-import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
-
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { Calendar, ChevronDown, ChevronLeft, ChevronRight, Download, Filter, Printer, RefreshCcw, Search } from 'lucide-react';
 import { ToastContainer, toast } from 'react-toastify';
@@ -50,61 +49,15 @@ const DuAnStatistics = () => {
         '14/ Đã thanh toán', '15/ Hoàn thành'
     ];
     const [chiData, setChiData] = useState([]);
-    const [cacheTimestamp, setCacheTimestamp] = useState(null);
-    const CACHE_DURATION = 120 * 60 * 1000; // 120 phút tính bằng milliseconds
+
     // Pagination state
     const [currentPage, setCurrentPage] = useState(1);
     const [itemsPerPage, setItemsPerPage] = useState(10);
-    const isCacheValid = useCallback(() => {
-        const now = new Date().getTime();
-        return cacheTimestamp && (now - cacheTimestamp < CACHE_DURATION);
-    }, [cacheTimestamp]);
-    const saveToCache = useCallback((key, data) => {
-        try {
-            const cacheData = {
-                timestamp: new Date().getTime(),
-                data: data
-            };
-            localStorage.setItem(key, JSON.stringify(cacheData));
-            console.log(`Saved ${key} to cache at ${new Date().toISOString()}`);
-            setCacheTimestamp(cacheData.timestamp);
-        } catch (error) {
-            console.error('Error saving to cache:', error);
-        }
-    }, []);
-    const getFromCache = useCallback((key) => {
-        try {
-            const cachedData = localStorage.getItem(key);
-            if (!cachedData) {
-                console.log(`No cached data found for ${key}`);
-                return null;
-            }
-            
-            const parsedData = JSON.parse(cachedData);
-            console.log(`Found cache for ${key} from ${new Date(parsedData.timestamp).toISOString()}`);
-            setCacheTimestamp(parsedData.timestamp);
-            
-            return parsedData.data;
-        } catch (error) {
-            console.error('Error reading from cache:', error);
-            return null;
-        }
-    }, []);
+
     // Chart ref
     const chartRef = useRef(null);
-   
-
-    const fetchChiData = useCallback(async (forceRefresh = false) => {
+    const fetchChiData = async () => {
         try {
-            // Kiểm tra cache nếu không phải force refresh
-            if (!forceRefresh) {
-                const cachedData = getFromCache('chiData');
-                if (cachedData && isCacheValid()) {
-                    setChiData(cachedData);
-                    return;
-                }
-            }
-
             setLoading(true);
             const response = await authUtils.apiRequest('CHI', 'Find', {
                 Properties: {
@@ -122,34 +75,22 @@ const DuAnStatistics = () => {
             }));
 
             setChiData(transformedChiData);
-            saveToCache('chiData', transformedChiData);
             setLoading(false);
         } catch (error) {
             console.error('Error fetching chi data:', error);
             toast.error('Lỗi khi tải dữ liệu chi tiêu');
             setLoading(false);
         }
-    }, [getFromCache, isCacheValid, saveToCache]);
+    };
 
     // Fetch data
-    const fetchProjects = useCallback(async (forceRefresh = false) => {
+    const fetchProjects = async () => {
         try {
-            // Kiểm tra cache trước khi gọi API
-            if (!forceRefresh) {
-                const cachedData = getFromCache('projectsData');
-                if (cachedData && isCacheValid()) {
-                    console.log('Using projects from cache');
-                    setProjects(cachedData);
-                    setLoading(false);
-                    toast.success('Đã tải dữ liệu từ cache');
-                    return;
-                }
-            }
-    
             setLoading(true);
             const response = await authUtils.apiRequest('DUAN', 'Find', {});
-    
-            // Transform data như cũ
+
+            // Transform data to ensure dates are properly formatted and numeric values are numbers
+            // Trong phần transform data của fetchProjects
             const transformedData = response.map(project => ({
                 ...project,
                 'Ngày nhận kế hoạch': project['Ngày nhận kế hoạch'] ? new Date(project['Ngày nhận kế hoạch']) : null,
@@ -162,40 +103,22 @@ const DuAnStatistics = () => {
                 'Tháng': project['Tháng'] || (project['Ngày nhận kế hoạch'] ? new Date(project['Ngày nhận kế hoạch']).getMonth() + 1 : null),
                 'Check': project['Check'] || 'Chưa đánh giá'
             }));
-    
-            console.log('Saving projects to cache');
+
             setProjects(transformedData);
-            saveToCache('projectsData', transformedData);
             setLoading(false);
-            toast.success('Đã tải dữ liệu mới từ server');
+            toast.success('Đã tải dữ liệu thành công');
         } catch (error) {
             console.error('Error fetching project list:', error);
             toast.error('Lỗi khi tải danh sách dự án');
             setLoading(false);
         }
-    }, [getFromCache, isCacheValid, saveToCache]);
+    };
 
     useEffect(() => {
-        const loadInitialData = async () => {
-            // Đầu tiên thử lấy dữ liệu từ cache
-            const cachedProjectsData = getFromCache('projectsData');
-            const cachedChiData = getFromCache('chiData');
-            
-            if (cachedProjectsData && cachedChiData && isCacheValid()) {
-                // Nếu cache hợp lệ, sử dụng nó
-                setProjects(cachedProjectsData);
-                setChiData(cachedChiData);
-                setLoading(false);
-                toast.info('Sử dụng dữ liệu từ bộ nhớ đệm');
-            } else {
-                // Nếu không có cache hoặc cache không hợp lệ, tải dữ liệu mới
-                await fetchProjects(true);
-                await fetchChiData(true);
-            }
-        };
-        
-        loadInitialData();
+        fetchProjects();
+        fetchChiData(); // Thêm dòng này
     }, []);
+
 
     // Reset pagination when filters change
     useEffect(() => {
@@ -1266,39 +1189,10 @@ const DuAnStatistics = () => {
 
     // Refresh data
     const handleRefreshData = () => {
-        fetchProjects(true); // true means force refresh from API
-        fetchChiData(true);
-        toast.info('Đang làm mới dữ liệu từ server...');
+        fetchProjects();
+        toast.info('Đang làm mới dữ liệu...');
     };
-    const clearCache = () => {
-        try {
-            localStorage.removeItem('projectsData');
-            localStorage.removeItem('chiData');
-            setCacheTimestamp(null);
-            toast.info('Đã xóa dữ liệu đệm');
-        } catch (error) {
-            console.error('Error clearing cache:', error);
-        }
-    };
-    const CacheInfo = () => {
-        if (!cacheTimestamp) return null;
-        
-        const cacheDate = new Date(cacheTimestamp);
-        const now = new Date();
-        const minutesAgo = Math.floor((now - cacheDate) / 60000);
-        
-        return (
-            <div className="text-xs text-gray-500 flex items-center mt-2">
-                <span>Dữ liệu được lưu đệm {minutesAgo} phút trước</span>
-                <button 
-                    onClick={clearCache}
-                    className="ml-2 text-red-500 hover:text-red-700"
-                >
-                    Xóa cache
-                </button>
-            </div>
-        );
-    };
+
     // Export to Excel
     const exportToExcel = () => {
         try {
@@ -1480,7 +1374,6 @@ const DuAnStatistics = () => {
                     {/* Header Section */}
                     <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4 print:hidden">
                         <h1 className="text-2xl font-bold text-gray-800">Thống Kê Dự Án</h1>
-                        <CacheInfo />
                         <div className="flex flex-wrap gap-2">
                             <button
                                 onClick={() => setShowFilters(!showFilters)}

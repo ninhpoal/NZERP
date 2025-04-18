@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Trích xuất văn bản từ ảnh</title>
+    <meta charset="UTF-8">
+    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        #imagePreview {
+            max-width: 100%;
+            max-height: 400px;
+            margin-top: 10px;
+        }
+        #result {
+            border: 1px solid #ddd;
+            padding: 10px;
+            min-height: 100px;
+            background-color: #f9f9f9;
+        }
+        .loading {
+            display: none;
+            margin-top: 10px;
+        }
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            cursor: pointer;
+            border-radius: 4px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Trích xuất văn bản từ ảnh</h1>
+        
+        <div>
+            <label for="imageUpload">Chọn ảnh:</label>
+            <input type="file" id="imageUpload" accept="image/*">
+        </div>
+        
+        <div>
+            <img id="imagePreview" src="" alt="Xem trước ảnh" style="display: none;">
+        </div>
+        
+        <button id="extractBtn">Trích xuất văn bản</button>
+        
+        <div class="loading" id="loading">
+            Đang xử lý... Vui lòng đợi.
+        </div>
+        
+        <div>
+            <h3>Kết quả:</h3>
+            <div id="result"></div>
+        </div>
+        
+        <div>
+            <h3>Trích xuất vùng bôi đỏ:</h3>
+            <div id="redAreaResult"></div>
+        </div>
+    </div>
+
+    <script>
+        // Hiển thị ảnh xem trước
+        document.getElementById('imageUpload').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(event) {
+                    const imgPreview = document.getElementById('imagePreview');
+                    imgPreview.src = event.target.result;
+                    imgPreview.style.display = 'block';
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+
+        // Xử lý trích xuất văn bản
+        document.getElementById('extractBtn').addEventListener('click', async function() {
+            const imageFile = document.getElementById('imageUpload').files[0];
+            if (!imageFile) {
+                alert('Vui lòng chọn ảnh trước!');
+                return;
+            }
+
+            const loadingEl = document.getElementById('loading');
+            const resultEl = document.getElementById('result');
+            const redAreaResultEl = document.getElementById('redAreaResult');
+            
+            loadingEl.style.display = 'block';
+            resultEl.innerText = 'Đang xử lý...';
+            redAreaResultEl.innerText = '';
+
+            try {
+                // Trích xuất toàn bộ văn bản từ ảnh
+                const worker = await Tesseract.createWorker('vie+eng');
+                const result = await worker.recognize(imageFile);
+                resultEl.innerText = result.data.text;
+                
+                // Tìm vùng văn bản có dạng "DNIP069: 0024to"
+                const matches = result.data.text.match(/DNIP\d{3}:\s*\d{4}to/g);
+                if (matches && matches.length > 0) {
+                    redAreaResultEl.innerText = matches.join('\n');
+                } else {
+                    redAreaResultEl.innerText = "Không tìm thấy định dạng DNIP[số]: [số]to trong ảnh";
+                }
+                
+                await worker.terminate();
+            } catch (error) {
+                resultEl.innerText = 'Lỗi: ' + error.message;
+            } finally {
+                loadingEl.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

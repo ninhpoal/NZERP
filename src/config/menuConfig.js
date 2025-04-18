@@ -114,6 +114,13 @@ const menuConfig = [
                     PhanQuyen: ["Admin"],
                     Phong: ["Giám đốc"],
                 }
+            },
+            {
+                text: 'Lương thực tế',
+                icon: Wallet,
+                path: '/Luongthucte',
+                description: 'Lương thực tế',
+                showInSidebar: true, // Hiện trên sidebar
             }
         ]
     },

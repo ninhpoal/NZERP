@@ -9,13 +9,14 @@ import Profile from './pages/Profile';
 import Users from './pages/UserManagement';
 import MenuStructurePage from './pages/MenuStructurePage';
 import AttendanceSystem from './pages/AttendanceSystem';
-import DuAnStatistics from './pages/DuanToiuu';
+import DuAnStatistics from './pages/DuAnStatistics';
 import AddDuan from './pages/AddDuan';
 import DanhSachKeHoach from './pages/DanhSachKeHoach';
 import ChiPhiStatistics from './pages/ChiPhiStatistics';
 import ThuPhiStatistics from './pages/ThuPhiStatistics';
 import { checkPermission } from './config/menuConfig';
 import ToolUpanh from './pages/toolupanh';
+import LuongThucTe from './pages/LuongThucTe';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
@@ -82,6 +83,7 @@ function App() {
     Tool: { PhanQuyen: ["All"] },
     profile: { PhanQuyen: ["All"] }, // Tất cả đều xem được
     users: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },
+    Luongthucte: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },
     addduan: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },
     thuchi: { PhanQuyen: ["Admin"], Phong: ["Giám đốc"], ChucVu: ["Kế toán"] },
     Chamcong: { PhanQuyen: ["Admin"], Phong: ["Hành chánh", "Giám đốc"] },
@@ -119,6 +121,12 @@ function App() {
                   <Route path="/users" element={
                     <RoleProtectedRoute requiredPermissions={routePermissions.users}>
                       <Users />
+                    </RoleProtectedRoute>
+                  } />
+                  {/* Trang lương thực tế */}
+                  <Route path="/Luongthucte" element={
+                    <RoleProtectedRoute requiredPermissions={routePermissions.Luongthucte}>
+                      <LuongThucTe />
                     </RoleProtectedRoute>
                   } />
 

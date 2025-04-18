@@ -8,6 +8,7 @@ const ImageSlicer = () => {
     const [dragOver, setDragOver] = useState(false);
     const [customNames, setCustomNames] = useState({});
     const [zipName, setZipName] = useState('hinh_anh_cua_toi');
+    const [filePrefix, setFilePrefix] = useState('');
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
     const [ocrProgress, setOcrProgress] = useState(0);
@@ -54,11 +55,10 @@ const ImageSlicer = () => {
             return updatedFiles;
         });
 
+        // Initialize with empty names instead of base filenames
         const newCustomNames = { ...customNames };
         filesWithPreview.forEach((fileObj) => {
-            const fileName = fileObj.file.name;
-            const baseName = fileName.substring(0, fileName.lastIndexOf('.')) || fileName;
-            newCustomNames[fileObj.id] = baseName;
+            newCustomNames[fileObj.id] = '';
         });
 
         setCustomNames(newCustomNames);
@@ -67,32 +67,33 @@ const ImageSlicer = () => {
     const performOCR = async (fileObj) => {
         setIsProcessing(true);
         setOcrProgress(0);
-        
+
         try {
-            const worker = await createWorker();
-            
-            // Đăng ký sự kiện progress
-            worker.on('progress', (progress) => {
-                if (progress.status === 'recognizing text') {
-                    setOcrProgress(parseInt(progress.progress * 100));
+            const worker = await createWorker({
+                logger: progress => {
+                    if (progress.status === 'recognizing text') {
+                        setOcrProgress(parseInt(progress.progress * 100));
+                    }
                 }
             });
-            
+
+            await worker.load();
             await worker.loadLanguage('vie+eng');
             await worker.initialize('vie+eng');
-            
-            const { data: { text } } = await worker.recognize(fileObj.previewUrl);
+
+            const { data } = await worker.recognize(fileObj.previewUrl);
+            const text = data.text;
+
             await worker.terminate();
-            
-            // Xử lý văn bản giữ nguyên
+
             let extractedName = text.split('\n')[0] || text;
             extractedName = extractedName.trim();
-            
+
             extractedName = extractedName
                 .substring(0, 30)
                 .replace(/[^a-zA-Z0-9À-ỹ\s]/g, '')
                 .trim();
-                
+
             if (extractedName) {
                 setCustomNames(prev => ({
                     ...prev,
@@ -100,7 +101,7 @@ const ImageSlicer = () => {
                 }));
                 return extractedName;
             }
-            
+
             return null;
         } catch (error) {
             console.error('OCR error:', error);
@@ -110,9 +111,10 @@ const ImageSlicer = () => {
             setOcrProgress(0);
         }
     };
+
     const processCurrentImageWithOCR = async () => {
         if (!currentFile) return;
-        
+
         const extractedName = await performOCR(currentFile);
         if (extractedName) {
             alert(`Đã quét OCR thành công! Tên được đề xuất: "${extractedName}"`);
@@ -126,14 +128,14 @@ const ImageSlicer = () => {
             alert('Vui lòng tải lên ít nhất một hình ảnh.');
             return;
         }
-        
+
         setIsProcessing(true);
-        
+
         for (let i = 0; i < files.length; i++) {
             setCurrentIndex(i);
             await performOCR(files[i]);
         }
-        
+
         setIsProcessing(false);
         alert('Đã quét OCR xong tất cả hình ảnh!');
     };
@@ -171,9 +173,14 @@ const ImageSlicer = () => {
 
         for (const fileObj of files) {
             const file = fileObj.file;
-            const customName = customNames[fileObj.id] || file.name;
+            const customName = customNames[fileObj.id] || '';
             const ext = file.name.split('.').pop();
-            const finalFileName = `${customName}.${ext}`;
+            
+            // Add prefix to custom name
+            const finalFileName = customName 
+                ? `${filePrefix ? filePrefix + '_' : ''}${customName}.${ext}`
+                : `${filePrefix ? filePrefix + '_' : ''}image_${fileObj.id.substring(0, 8)}.${ext}`;
+                
             const fileData = await file.arrayBuffer();
             zip.file(finalFileName, fileData);
         }
@@ -224,18 +231,35 @@ const ImageSlicer = () => {
             <div className="bg-white rounded-xl shadow-xl p-6 border border-gray-100">
                 <h1 className="text-3xl font-bold text-center mb-6 text-indigo-700">Bộ xử lý ảnh với OCR</h1>
 
-                {/* ZIP name input */}
-                <div className="mb-6">
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Tên file ZIP:
-                    </label>
-                    <input
-                        type="text"
-                        value={zipName}
-                        onChange={(e) => setZipName(e.target.value)}
-                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
-                        placeholder="Nhập tên cho file ZIP"
-                    />
+                {/* File naming settings */}
+                <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {/* ZIP name input */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Tên file ZIP:
+                        </label>
+                        <input
+                            type="text"
+                            value={zipName}
+                            onChange={(e) => setZipName(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            placeholder="Nhập tên cho file ZIP"
+                        />
+                    </div>
+                    
+                    {/* File prefix input */}
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-2">
+                            Tiền tố cho tên file:
+                        </label>
+                        <input
+                            type="text"
+                            value={filePrefix}
+                            onChange={(e) => setFilePrefix(e.target.value)}
+                            className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all"
+                            placeholder="Ví dụ: tento"
+                        />
+                    </div>
                 </div>
 
                 {/* Main content */}
@@ -278,8 +302,8 @@ const ImageSlicer = () => {
                                     <div className="absolute inset-0 bg-black/70 flex flex-col items-center justify-center">
                                         <div className="text-white mb-3">Đang quét OCR...</div>
                                         <div className="w-64 h-3 bg-gray-700 rounded-full overflow-hidden">
-                                            <div 
-                                                className="h-full bg-indigo-500 transition-all duration-300" 
+                                            <div
+                                                className="h-full bg-indigo-500 transition-all duration-300"
                                                 style={{ width: `${ocrProgress}%` }}
                                             ></div>
                                         </div>
@@ -350,7 +374,7 @@ const ImageSlicer = () => {
 
                                 <div className="mb-4">
                                     <label className="block text-sm font-medium text-gray-700 mb-2">
-                                        Đặt tên cho hình ảnh:
+                                        Tên cho hình ảnh (không gồm tiền tố và đuôi file):
                                     </label>
                                     <input
                                         type="text"
@@ -359,17 +383,21 @@ const ImageSlicer = () => {
                                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                                         placeholder="Nhập tên cho hình ảnh"
                                     />
+                                    {filePrefix && (
+                                        <p className="mt-2 text-sm text-gray-600">
+                                            Tên file sẽ là: <span className="font-medium">{filePrefix}_{customNames[currentFile.id] || '[tên file]'}.{currentFile.file.name.split('.').pop()}</span>
+                                        </p>
+                                    )}
                                 </div>
-                                
+
                                 {/* Nút OCR cho hình ảnh hiện tại */}
                                 <button
                                     onClick={processCurrentImageWithOCR}
                                     disabled={isProcessing}
-                                    className={`w-full mb-3 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${
-                                        isProcessing 
-                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
-                                        : 'bg-green-600 text-white hover:bg-green-700'
-                                    }`}
+                                    className={`w-full mb-3 py-2.5 rounded-lg font-medium transition-all flex items-center justify-center gap-2 ${isProcessing
+                                            ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                            : 'bg-green-600 text-white hover:bg-green-700'
+                                        }`}
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
@@ -382,11 +410,10 @@ const ImageSlicer = () => {
                                     <button
                                         onClick={() => removeFile(currentFile)}
                                         disabled={isProcessing}
-                                        className={`flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm rounded-lg font-medium transition-colors ${
-                                            isProcessing 
-                                            ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                                            : 'bg-red-100 text-red-600 hover:bg-red-200'
-                                        }`}
+                                        className={`flex items-center justify-center gap-2 w-full px-4 py-2.5 text-sm rounded-lg font-medium transition-colors ${isProcessing
+                                                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                                                : 'bg-red-100 text-red-600 hover:bg-red-200'
+                                            }`}
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -414,8 +441,8 @@ const ImageSlicer = () => {
                                     <div
                                         key={fileObj.id}
                                         className={`relative border rounded-lg overflow-hidden cursor-pointer h-24 group transition-all ${index === currentIndex
-                                                ? 'ring-2 ring-indigo-500 shadow-md scale-105 z-10'
-                                                : 'hover:shadow-md hover:scale-105'
+                                            ? 'ring-2 ring-indigo-500 shadow-md scale-105 z-10'
+                                            : 'hover:shadow-md hover:scale-105'
                                             }`}
                                         onClick={() => !isProcessing && setCurrentIndex(index)}
                                     >
@@ -450,11 +477,10 @@ const ImageSlicer = () => {
                             <button
                                 onClick={processAllImagesWithOCR}
                                 disabled={isProcessing || files.length === 0}
-                                className={`w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
-                                    isProcessing || files.length === 0
-                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed' 
-                                    : 'bg-green-600 text-white hover:bg-green-700 shadow-md'
-                                }`}
+                                className={`w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${isProcessing || files.length === 0
+                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                        : 'bg-green-600 text-white hover:bg-green-700 shadow-md'
+                                    }`}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
@@ -465,11 +491,10 @@ const ImageSlicer = () => {
                             <button
                                 onClick={downloadAsZip}
                                 disabled={files.length === 0 || isProcessing}
-                                className={`w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
-                                    files.length === 0 || isProcessing
-                                    ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
-                                    : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg'
-                                }`}
+                                className={`w-full py-3.5 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${files.length === 0 || isProcessing
+                                        ? 'bg-gray-200 text-gray-500 cursor-not-allowed'
+                                        : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg'
+                                    }`}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -480,11 +505,10 @@ const ImageSlicer = () => {
                             <button
                                 onClick={clearAllFiles}
                                 disabled={files.length === 0 || isProcessing}
-                                className={`w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${
-                                    files.length === 0 || isProcessing
-                                    ? 'border border-gray-200 text-gray-400 cursor-not-allowed'
-                                    : 'border border-red-200 text-red-600 hover:bg-red-50'
-                                }`}
+                                className={`w-full py-3 rounded-xl font-medium transition-all flex items-center justify-center gap-2 ${files.length === 0 || isProcessing
+                                        ? 'border border-gray-200 text-gray-400 cursor-not-allowed'
+                                        : 'border border-red-200 text-red-600 hover:bg-red-50'
+                                    }`}
                             >
                                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -496,9 +520,7 @@ const ImageSlicer = () => {
                 </div>
             </div>
 
-            <div className="text-center text-gray-500 text-sm mt-6">
-                © 2025 Bộ xử lý ảnh OCR - Công cụ xử lý hình ảnh và quét văn bản miễn phí
-            </div>
+          
         </div>
     );
 };
