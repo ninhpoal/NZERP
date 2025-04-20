@@ -12,6 +12,10 @@ const ImageSlicer = () => {
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isProcessing, setIsProcessing] = useState(false);
     const [ocrProgress, setOcrProgress] = useState(0);
+    const [selection, setSelection] = useState(null);
+    const [isSelecting, setIsSelecting] = useState(false);
+    const [startPoint, setStartPoint] = useState(null);
+    const imageRef = useRef(null);
     const fileInputRef = useRef(null);
     const nameInputRefs = useRef({});
 
@@ -74,27 +78,114 @@ const ImageSlicer = () => {
         setCustomNames(newCustomNames);
     };
 
+    const handleMouseDown = (e) => {
+        if (!currentFile || isProcessing) return;
+        
+        const rect = imageRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        setIsSelecting(true);
+        setStartPoint({ x, y });
+        setSelection(null);
+    };
+
+    const handleMouseMove = (e) => {
+        if (!isSelecting || !startPoint) return;
+        
+        const rect = imageRef.current.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        setSelection({
+            x: Math.min(startPoint.x, x),
+            y: Math.min(startPoint.y, y),
+            width: Math.abs(x - startPoint.x),
+            height: Math.abs(y - startPoint.y)
+        });
+    };
+
+    const handleMouseUp = () => {
+        setIsSelecting(false);
+    };
+
     const performOCR = async (fileObj) => {
+        if (!fileObj || !fileObj.previewUrl) {
+            alert('Không thể xử lý hình ảnh này. Vui lòng thử lại.');
+            return null;
+        }
+
         setIsProcessing(true);
         setOcrProgress(0);
 
+        let worker = null;
         try {
-            const worker = await createWorker({
+            // Khởi tạo worker với cấu hình đặc biệt
+            worker = await createWorker({
                 logger: progress => {
                     if (progress.status === 'recognizing text') {
                         setOcrProgress(parseInt(progress.progress * 100));
                     }
-                }
+                },
+                errorHandler: error => {
+                    console.error('Worker error:', error);
+                },
+                gzip: false,
+                cachePath: './tesseract-cache',
+                langPath: './tessdata',
+                dataPath: './tessdata'
             });
 
+            if (!worker) {
+                throw new Error('Không thể khởi tạo OCR worker');
+            }
+
+            // Load ngôn ngữ với cấu hình đặc biệt
             await worker.load();
-            await worker.loadLanguage('vie+eng');
-            await worker.initialize('vie+eng');
+            await worker.loadLanguage('vie+eng', {
+                tessjs_create_worker: '1',
+                tessjs_create_worker_args: ['--tessdata-dir', './tessdata']
+            });
+            await worker.initialize('vie+eng', 1, {
+                tessjs_create_worker: '1',
+                tessjs_create_worker_args: ['--tessdata-dir', './tessdata']
+            });
 
-            const { data } = await worker.recognize(fileObj.previewUrl);
-            const text = data.text;
+            let options = {};
+            if (selection && imageRef.current) {
+                try {
+                    const rect = imageRef.current.getBoundingClientRect();
+                    const scaleX = currentFile.file.width / rect.width;
+                    const scaleY = currentFile.file.height / rect.height;
+                    
+                    options = {
+                        rectangle: {
+                            left: Math.floor(selection.x * scaleX),
+                            top: Math.floor(selection.y * scaleY),
+                            width: Math.floor(selection.width * scaleX),
+                            height: Math.floor(selection.height * scaleY)
+                        }
+                    };
+                } catch (error) {
+                    console.warn('Lỗi khi tính toán vùng chọn:', error);
+                }
+            }
 
-            await worker.terminate();
+            // Thêm cấu hình cho recognize
+            const { data } = await worker.recognize(fileObj.previewUrl, {
+                ...options,
+                tessjs_create_worker: '1',
+                tessjs_create_worker_args: ['--tessdata-dir', './tessdata']
+            });
+            
+            if (!data || !data.text) {
+                throw new Error('Không thể nhận dạng văn bản');
+            }
+
+            const text = data.text.trim();
+            if (!text) {
+                throw new Error('Không tìm thấy văn bản trong hình ảnh');
+            }
 
             let extractedName = text.split('\n')[0] || text;
             extractedName = extractedName.trim();
@@ -115,21 +206,30 @@ const ImageSlicer = () => {
             return null;
         } catch (error) {
             console.error('OCR error:', error);
+            alert(`Lỗi khi quét OCR: ${error.message || 'Vui lòng thử lại'}`);
             return null;
         } finally {
+            if (worker) {
+                try {
+                    await worker.terminate();
+                } catch (error) {
+                    console.warn('Lỗi khi kết thúc worker:', error);
+                }
+            }
             setIsProcessing(false);
             setOcrProgress(0);
         }
     };
 
     const processCurrentImageWithOCR = async () => {
-        if (!currentFile) return;
+        if (!currentFile) {
+            alert('Vui lòng chọn hình ảnh trước');
+            return;
+        }
 
         const extractedName = await performOCR(currentFile);
         if (extractedName) {
             alert(`Đã quét OCR thành công! Tên được đề xuất: "${extractedName}"`);
-        } else {
-            alert('Không thể trích xuất văn bản từ hình ảnh này.');
         }
     };
 
@@ -318,6 +418,8 @@ const ImageSlicer = () => {
                             <span>
                                 <strong>Mẹo:</strong> Nhấn <kbd className="bg-blue-100 px-1 py-0.5 rounded mx-1">Tab</kbd> để chuyển sang hình tiếp theo, 
                                 <kbd className="bg-blue-100 px-1 py-0.5 rounded mx-1">Shift+Tab</kbd> để quay lại hình trước.
+                                <br />
+                                <strong>Quét OCR:</strong> Kéo chuột để chọn vùng cần quét trên ảnh.
                             </span>
                         </p>
                     </div>
@@ -328,13 +430,33 @@ const ImageSlicer = () => {
                     {/* Left side - Image viewer */}
                     <div className="flex-1">
                         {currentFile ? (
-                            <div className="relative border rounded-xl overflow-hidden bg-[#fffff] h-[620px] shadow-md">
+                            <div 
+                                className="relative border rounded-xl overflow-hidden bg-[#fffff] h-[620px] shadow-md"
+                                onMouseDown={handleMouseDown}
+                                onMouseMove={handleMouseMove}
+                                onMouseUp={handleMouseUp}
+                                onMouseLeave={handleMouseUp}
+                            >
                                 {/* Image viewer */}
                                 <img
+                                    ref={imageRef}
                                     src={currentFile.previewUrl}
                                     alt={currentFile.file.name}
                                     className="w-full h-full object-contain"
                                 />
+
+                                {/* Selection rectangle */}
+                                {selection && (
+                                    <div
+                                        className="absolute border-2 border-blue-500 bg-blue-500/20"
+                                        style={{
+                                            left: `${selection.x}px`,
+                                            top: `${selection.y}px`,
+                                            width: `${selection.width}px`,
+                                            height: `${selection.height}px`
+                                        }}
+                                    />
+                                )}
 
                                 {/* Navigation arrows */}
                                 <div className="absolute inset-0 flex items-center justify-between px-4">
@@ -467,7 +589,7 @@ const ImageSlicer = () => {
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                                     </svg>
-                                    Quét OCR hình ảnh này
+                                    {selection ? 'Quét OCR vùng đã chọn' : 'Quét OCR toàn bộ hình ảnh'}
                                 </button>
 
                                 <div className="flex items-center">

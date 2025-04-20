@@ -9,7 +9,7 @@ import Profile from './pages/Profile';
 import Users from './pages/UserManagement';
 import MenuStructurePage from './pages/MenuStructurePage';
 import AttendanceSystem from './pages/AttendanceSystem';
-import DuAnStatistics from './pages/DuAnStatistics';
+import DuAnStatistics from './pages/DuanToiuu';
 import AddDuan from './pages/AddDuan';
 import DanhSachKeHoach from './pages/DanhSachKeHoach';
 import ChiPhiStatistics from './pages/ChiPhiStatistics';

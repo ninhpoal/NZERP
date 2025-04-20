@@ -277,12 +277,12 @@ const PaginationControls = memo(({ currentPage, totalPages, handlePageChange }) 
 const DuAnStatistics = () => {
     // State Management - Consolidated state
     const [filters, setFilters] = useState({
-        area: 'TẤT CẢ',
-        status: 'TẤT CẢ',
+        area: ['TẤT CẢ'],
+        status: ['TẤT CẢ'],
         year: new Date().getFullYear(),
         months: ['TẤT CẢ'],
         budget: 'TẤT CẢ',
-        check: 'TẤT CẢ'
+        check: ['TẤT CẢ']
     });
     const [projects, setProjects] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -313,10 +313,43 @@ const DuAnStatistics = () => {
 
     // Update filter function
     const updateFilter = useCallback((key, value) => {
-        setFilters(prev => ({
-            ...prev,
-            [key]: value
-        }));
+        setFilters(prev => {
+            if (key === 'year' || key === 'budget') {
+                return {
+                    ...prev,
+                    [key]: value
+                };
+            }
+            
+            const currentValues = prev[key];
+            let newValues;
+            
+            if (currentValues.includes(value)) {
+                // Nếu đã chọn "TẤT CẢ" và đang bỏ chọn một giá trị khác
+                if (value === 'TẤT CẢ') {
+                    newValues = [];
+                } else {
+                    newValues = currentValues.filter(v => v !== value);
+                    // Nếu không còn giá trị nào được chọn, chọn "TẤT CẢ"
+                    if (newValues.length === 0) {
+                        newValues = ['TẤT CẢ'];
+                    }
+                }
+            } else {
+                // Nếu đang chọn "TẤT CẢ" và chọn thêm một giá trị khác
+                if (value === 'TẤT CẢ') {
+                    newValues = ['TẤT CẢ'];
+                } else {
+                    newValues = [...currentValues.filter(v => v !== 'TẤT CẢ'), value];
+                }
+            }
+            
+            return {
+                ...prev,
+                [key]: newValues
+            };
+        });
+        
         setPaginationState(prev => ({
             ...prev,
             currentPage: 1
@@ -462,9 +495,9 @@ const DuAnStatistics = () => {
                 (project['Mã kế hoạch']?.toLowerCase().includes(search.toLowerCase())) ||
                 (project['POP']?.toLowerCase().includes(search.toLowerCase()));
 
-            const matchesArea = filters.area === 'TẤT CẢ' || project['Khu vực'] === filters.area;
-            const matchesStatus = filters.status === 'TẤT CẢ' || project['Trạng thái'] === filters.status;
-            const matchesCheck = filters.check === 'TẤT CẢ' || project['Check'] === filters.check;
+            const matchesArea = filters.area.includes('TẤT CẢ') || filters.area.some(area => project['Khu vực'] === area);
+            const matchesStatus = filters.status.includes('TẤT CẢ') || filters.status.some(status => project['Trạng thái'] === status);
+            const matchesCheck = filters.check.includes('TẤT CẢ') || filters.check.some(check => project['Check'] === check);
 
             const projectYear = project['Ngày nhận kế hoạch']
                 ? new Date(project['Ngày nhận kế hoạch']).getFullYear()
@@ -475,8 +508,11 @@ const DuAnStatistics = () => {
             const matchesMonth = filters.months.includes('TẤT CẢ') || (project['Ngày nhận kế hoạch'] &&
                 filters.months.some(monthName => {
                     if (monthName === 'TẤT CẢ') return true;
-                    const monthNumber = parseInt(monthName.replace('Tháng ', ''));
-                    return new Date(project['Ngày nhận kế hoạch']).getMonth() + 1 === monthNumber;
+                    if (typeof monthName === 'string') {
+                        const monthNum = parseInt(monthName.replace('Tháng ', ''));
+                        return new Date(project['Ngày nhận kế hoạch']).getMonth() + 1 === monthNum;
+                    }
+                    return false;
                 }));
 
             // Filter project by budget range function
@@ -1656,34 +1692,36 @@ const DuAnStatistics = () => {
                                     {/* Area filter */}
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Khu vực:</h3>
-                                        <div className="relative">
-                                            <select
-                                                value={filters.area}
-                                                onChange={(e) => updateFilter('area', e.target.value)}
-                                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 appearance-none pr-10"
-                                            >
-                                                {areas.map((area, index) => (
-                                                    <option key={index} value={area}>{area}</option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+                                        <div className="max-h-48 overflow-y-auto bg-white border border-gray-300 rounded-lg p-2">
+                                            {areas.map((area, index) => (
+                                                <label key={index} className="flex items-center space-x-2 p-1 hover:bg-gray-50 rounded">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={filters.area.includes(area)}
+                                                        onChange={() => updateFilter('area', area)}
+                                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                    />
+                                                    <span className="text-sm text-gray-700">{area}</span>
+                                                </label>
+                                            ))}
                                         </div>
                                     </div>
 
                                     {/* Status filter */}
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Trạng thái:</h3>
-                                        <div className="relative">
-                                            <select
-                                                value={filters.status}
-                                                onChange={(e) => updateFilter('status', e.target.value)}
-                                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 appearance-none pr-10"
-                                            >
-                                                {statuses.map((status, index) => (
-                                                    <option key={index} value={status}>{status}</option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+                                        <div className="max-h-48 overflow-y-auto bg-white border border-gray-300 rounded-lg p-2">
+                                            {statuses.map((status, index) => (
+                                                <label key={index} className="flex items-center space-x-2 p-1 hover:bg-gray-50 rounded">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={filters.status.includes(status)}
+                                                        onChange={() => updateFilter('status', status)}
+                                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                    />
+                                                    <span className="text-sm text-gray-700">{status}</span>
+                                                </label>
+                                            ))}
                                         </div>
                                     </div>
 
@@ -1707,36 +1745,36 @@ const DuAnStatistics = () => {
                                     {/* Month filter */}
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Tháng:</h3>
-                                        <Select
-                                            isMulti
-                                            options={monthOptions}
-                                            value={monthOptions.filter(option => filters.months.includes(option.value))}
-                                            onChange={(selectedOptions) => {
-                                                if (selectedOptions.length === 0) {
-                                                    updateFilter('months', ['TẤT CẢ']);
-                                                } else {
-                                                    updateFilter('months', selectedOptions.map(option => option.value));
-                                                }
-                                            }}
-                                            placeholder="Chọn tháng..."
-                                            className="basic-multi-select"
-                                            classNamePrefix="select"
-                                        />
+                                        <div className="max-h-48 overflow-y-auto bg-white border border-gray-300 rounded-lg p-2">
+                                            {months.map((month, index) => (
+                                                <label key={index} className="flex items-center space-x-2 p-1 hover:bg-gray-50 rounded">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={filters.months.includes(month)}
+                                                        onChange={() => updateFilter('months', month)}
+                                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                    />
+                                                    <span className="text-sm text-gray-700">{month}</span>
+                                                </label>
+                                            ))}
+                                        </div>
                                     </div>
 
+                                    {/* Check filter */}
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Đánh giá:</h3>
-                                        <div className="relative">
-                                            <select
-                                                value={filters.check}
-                                                onChange={(e) => updateFilter('check', e.target.value)}
-                                                className="w-full p-2.5 border border-gray-300 rounded-lg focus:ring-indigo-500 focus:border-indigo-500 appearance-none pr-10"
-                                            >
-                                                {checkValues.map((value, index) => (
-                                                    <option key={index} value={value}>{value}</option>
-                                                ))}
-                                            </select>
-                                            <ChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400 pointer-events-none" />
+                                        <div className="max-h-48 overflow-y-auto bg-white border border-gray-300 rounded-lg p-2">
+                                            {checkValues.map((check, index) => (
+                                                <label key={index} className="flex items-center space-x-2 p-1 hover:bg-gray-50 rounded">
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={filters.check.includes(check)}
+                                                        onChange={() => updateFilter('check', check)}
+                                                        className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                                    />
+                                                    <span className="text-sm text-gray-700">{check}</span>
+                                                </label>
+                                            ))}
                                         </div>
                                     </div>
 
@@ -1778,6 +1816,54 @@ const DuAnStatistics = () => {
                                         </div>
                                     </div>
                                 </div>
+                            </div>
+                        )}
+
+                        {/* Hiển thị các bộ lọc đang áp dụng */}
+                        {showFilters && (
+                            <div className="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200 mt-2">
+                                <div className="flex flex-wrap gap-2">
+                                    {filters.area.length > 0 && filters.area[0] !== 'TẤT CẢ' && (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                            Khu vực: {filters.area.join(', ')}
+                                        </span>
+                                    )}
+                                    {filters.status.length > 0 && filters.status[0] !== 'TẤT CẢ' && (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                            Trạng thái: {filters.status.join(', ')}
+                                        </span>
+                                    )}
+                                    {filters.months.length > 0 && filters.months[0] !== 'TẤT CẢ' && (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+                                            Tháng: {filters.months.join(', ')}
+                                        </span>
+                                    )}
+                                    {filters.check.length > 0 && filters.check[0] !== 'TẤT CẢ' && (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                                            Đánh giá: {filters.check.join(', ')}
+                                        </span>
+                                    )}
+                                    {filters.year !== new Date().getFullYear() && (
+                                        <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                                            Năm: {filters.year}
+                                        </span>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={() => {
+                                        setFilters({
+                                            area: ['TẤT CẢ'],
+                                            status: ['TẤT CẢ'],
+                                            year: new Date().getFullYear(),
+                                            months: ['TẤT CẢ'],
+                                            budget: 'TẤT CẢ',
+                                            check: ['TẤT CẢ']
+                                        });
+                                    }}
+                                    className="inline-flex items-center px-2.5 py-1.5 border border-gray-300 shadow-sm text-xs font-medium rounded text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+                                >
+                                    Xóa bộ lọc
+                                </button>
                             </div>
                         )}
                     </div>
