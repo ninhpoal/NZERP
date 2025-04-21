@@ -24,6 +24,45 @@ class AuthUtils {
             throw error;
         }
     }
+    async apiRequestHSHC(tableName, action, Properties = {}, data) {
+        const apiUrl = `https://www.appsheet.com/api/v2/apps/8df0bddc-26ed-4635-933d-c3b27ea34209/tables/${tableName}/Action`;
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'ApplicationAccessKey': 'V2-Vlggt-v63lj-pVJ48-cWTVr-RzWot-ppy1m-PUNEg-SKZQb',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    Action: action,
+                    Properties: {
+                        Locale: 'vi-VN',
+                        Timezone: 'Asia/Ho_Chi_Minh',
+                        ...Properties
+                    },
+                    ...data
+                })
+            });
+            
+            if (!response.ok) throw new Error('Network response was not ok');
+            
+            // Check if response is empty
+            const text = await response.text();
+            if (!text) {
+                return {}; // Return empty object if response is empty
+            }
+            
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.error('Error parsing JSON response:', e);
+                return {}; // Return empty object if parsing fails
+            }
+        } catch (error) {
+            console.error('API request failed:', error);
+            throw error;
+        }
+    }
     async apiRequestThuChi(tableName, action, data, select = {}) {
         const apiUrl = `https://www.appsheet.com/api/v2/apps/1a8d9270-a4ff-46b8-94fc-db1e4632f273/tables/${tableName}/Action`;
         try {

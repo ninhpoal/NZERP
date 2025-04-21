@@ -17,6 +17,7 @@ import ThuPhiStatistics from './pages/ThuPhiStatistics';
 import { checkPermission } from './config/menuConfig';
 import ToolUpanh from './pages/toolupanh';
 import LuongThucTe from './pages/LuongThucTe';
+import AddHSHC from './pages/AddHSHC';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const location = useLocation();
@@ -134,6 +135,12 @@ function App() {
                   <Route path="/addduan" element={
                     <RoleProtectedRoute requiredPermissions={routePermissions.addduan}>
                       <AddDuan />
+                    </RoleProtectedRoute>
+                  } />
+                   {/* Trang thêm dự án */}
+                   <Route path="/addhshc" element={
+                    <RoleProtectedRoute requiredPermissions={routePermissions.addduan}>
+                      <AddHSHC />
                     </RoleProtectedRoute>
                   } />
                    {/* Trang thêm dự án */}

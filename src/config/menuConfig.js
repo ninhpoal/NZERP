@@ -149,7 +149,7 @@ const menuConfig = [
                 icon: IdCard,
                 path: '/Chamcong',
                 description: 'Chấm công',
-                showInSidebar: true, // Hiện trên sidebar
+                showInSidebar: false,
                 permissions: {
                     PhanQuyen: ["Admin"],
                     Phong: ["Hành chánh", "Giám đốc"],
@@ -171,7 +171,7 @@ const menuConfig = [
                 icon: Edit,
                 path: '/addduan',
                 description: 'Thêm dự án nhanh',
-                showInSidebar: true, // Hiện trên sidebar
+                showInSidebar: false,
                 permissions: {
                     PhanQuyen: ["Admin"],
                     Phong: ["Hành chánh", "Giám đốc"],
@@ -182,7 +182,18 @@ const menuConfig = [
                 icon: Edit,
                 path: '/toolupanh',
                 description: 'đổi tên hình nhanh',
-                showInSidebar: true, // Hiện trên sidebar
+                showInSidebar: false,
+                permissions: {
+                    PhanQuyen: ["Admin"],
+                    Phong: ["Hành chánh", "Giám đốc"],
+                }
+            },
+            {
+                text: 'File HSHC',
+                icon: Edit,
+                path: '/addhshc',
+                description: 'đổi tên hình nhanh',
+                showInSidebar: false,
                 permissions: {
                     PhanQuyen: ["Admin"],
                     Phong: ["Hành chánh", "Giám đốc"],
@@ -219,37 +230,34 @@ export const checkPermission = (itemOrPermissions, userData) => {
     // Xác định đối tượng permissions (có thể là item.permissions hoặc chính là permissions)
     const permissions = itemOrPermissions.permissions || itemOrPermissions;
     
-    // Debug logs
-    console.log("Checking permissions:", permissions);
-    console.log("User data:", userData);
+  
     
     // Nếu không có thông tin phân quyền hoặc item đó cho phép tất cả
     if (!permissions) return false;
 
     // Nếu PhanQuyen có "All", cho phép mọi người dùng
     if (permissions.PhanQuyen && permissions.PhanQuyen.includes("All")) {
-        console.log("Permission granted: All access");
+     
         return true;
     }
 
     // Nếu là ADMIN, luôn được quyền truy cập
     if (userData?.['Phân quyền'] === 'Admin') {
-        console.log("Permission granted: Admin role");
+    
         return true;
     }
 
     // Kiểm tra theo PhanQuyen
     if (permissions.PhanQuyen && userData?.['Phân quyền']) {
         if (permissions.PhanQuyen.includes(userData['Phân quyền'])) {
-            console.log("Permission granted: Role match");
-            return true;
+      
         }
     }
 
     // Kiểm tra theo Phong (phòng ban)
     if (permissions.Phong && userData?.['Phòng']) {
         if (permissions.Phong.includes(userData['Phòng'])) {
-            console.log("Permission granted: Department match");
+        
             return true;
         }
     }
@@ -257,7 +265,7 @@ export const checkPermission = (itemOrPermissions, userData) => {
     // Kiểm tra theo ChucVu
     if (permissions.ChucVu && userData?.['Chức vụ']) {
         if (permissions.ChucVu.includes(userData['Chức vụ'])) {
-            console.log("Permission granted: Position match");
+           
             return true;
         }
     }
@@ -265,12 +273,12 @@ export const checkPermission = (itemOrPermissions, userData) => {
     // Kiểm tra mã nhân viên cụ thể
     if (permissions.employeeCodes && userData?.['Mã nhân viên']) {
         if (permissions.employeeCodes.includes(userData['Mã nhân viên'])) {
-            console.log("Permission granted: Employee code match");
+          
             return true;
         }
     }
 
-    console.log("Permission denied");
+  
     return false;
 };
 
