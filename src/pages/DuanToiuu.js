@@ -291,6 +291,7 @@ const DuAnStatistics = () => {
     const [showFilters, setShowFilters] = useState(false);
     const [chartType, setChartType] = useState('monthly'); // 'monthly', 'cumulative', 'average'
     const [chiData, setChiData] = useState([]);
+    const [dtData, setDTData] = useState([]); // Thêm state cho DTDATA
 
     // Pagination state
     const [paginationState, setPaginationState] = useState({
@@ -430,6 +431,35 @@ const DuAnStatistics = () => {
         }
     }, []);
 
+    // Fetch DTDATA with abort controller
+    const fetchDTData = useCallback(async (signal) => {
+        try {
+            setLoading(true);
+            const response = await authUtils.apiRequest('DTDATA', 'Find', {}, { signal });
+
+            // Transform dữ liệu DTDATA
+            const transformedDTData = response.map(dt => ({
+                ...dt,
+                'Ngày': dt['Ngày'] ? new Date(dt['Ngày']) : null,
+                'Số lượng': parseFloat(dt['Số lượng']) || 0,
+                'Đơn giá': parseFloat(dt['Đơn giá']) || 0,
+                'Thành tiền': parseFloat(dt['Thành tiền']) || 0,
+                'Doanh thu': parseFloat(dt['Doanh thu']) || 0,
+                'Tháng': dt['Ngày'] ? new Date(dt['Ngày']).getMonth() + 1 : null,
+                'Năm': dt['Ngày'] ? new Date(dt['Ngày']).getFullYear() : null
+            }));
+
+            setDTData(transformedDTData);
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('Error fetching DTDATA:', error);
+                toast.error('Lỗi khi tải dữ liệu DTDATA');
+            }
+        } finally {
+            setLoading(false);
+        }
+    }, []);
+
     // Initial data fetch
     useEffect(() => {
         const controller = new AbortController();
@@ -437,9 +467,10 @@ const DuAnStatistics = () => {
 
         fetchProjects(signal);
         fetchChiData(signal);
+        fetchDTData(signal); // Thêm gọi API DTDATA
 
         return () => controller.abort();
-    }, [fetchProjects, fetchChiData]);
+    }, [fetchProjects, fetchChiData, fetchDTData]);
 
     // Sorting function
     const requestSort = useCallback((key) => {
@@ -972,10 +1003,34 @@ const DuAnStatistics = () => {
             .reduce((sum, chi) => sum + (chi['SỐ TIỀN'] || 0), 0);
     }, [chiData, filters.year, filters.months]);
 
+    // Calculate monthly DT statistics
+    const calculateMonthlyDTStatistics = useMemo(() => {
+        const monthlyStats = {};
+
+        for (let month = 1; month <= 12; month++) {
+            const monthName = `Tháng ${month}`;
+            if (filters.months.includes('TẤT CẢ') || filters.months.includes(monthName)) {
+                const monthDTData = dtData.filter(dt => {
+                    if (!dt['Ngày']) return false;
+                    const dtDate = new Date(dt['Ngày']);
+                    return dtDate.getMonth() + 1 === month && dtDate.getFullYear() === filters.year;
+                });
+
+                monthlyStats[monthName] = {
+                    dtCount: monthDTData.length,
+                    totalRevenue: monthDTData.reduce((sum, dt) => sum + (dt['Doanh thu'] || 0), 0)
+                };
+            }
+        }
+
+        return monthlyStats;
+    }, [dtData, filters.year, filters.months]);
+
     // Get chart configuration
     const getChartConfig = useMemo(() => {
         const labels = months.slice(1).map(month => month);
         const monthlyExpenses = calculateMonthlyExpenses;
+        const monthlyDTData = calculateMonthlyDTStatistics;
 
         // Common options for all chart types
         const commonOptions = {
@@ -1006,7 +1061,6 @@ const DuAnStatistics = () => {
                     anchor: 'end',
                     formatter: function (value, context) {
                         if (context.dataset.label.includes('Doanh thu') || context.dataset.label.includes('Chi tiêu')) {
-                            // Hiển thị doanh thu theo đơn vị triệu hoặc tỷ để gọn hơn
                             if (value >= 1000000000) {
                                 return (value / 1000000000).toFixed(1) + ' tỷ';
                             } else if (value >= 1000000) {
@@ -1031,439 +1085,155 @@ const DuAnStatistics = () => {
             },
         };
 
-        switch (chartType) {
-            case 'monthly': {
-                const monthlyData = prepareMonthlyData;
-                return {
-                    type: 'bar',
-                    data: {
-                        labels: monthlyData.map(item => item.monthName),
-                        datasets: [
-                            {
-                                type: 'bar',
-                                label: 'Tổng dự án',
-                                data: monthlyData.map(item => item.projectCount),
-                                backgroundColor: '#4F46E5',
-                                yAxisID: 'y',
-                                datalabels: {
-                                    color: '#4F46E5',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: 'Doanh thu HSHC',
-                                data: monthlyData.map(item => item.totalRevenue),
-                                backgroundColor: '#EC4899',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#EC4899',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: 'Doanh thu tạm tính',
-                                data: monthlyData.map(item => {
-                                    const monthProjects = getSortedFilteredItems.filter(project => {
-                                        if (!project['Ngày nhận kế hoạch']) return false;
-                                        const projectDate = new Date(project['Ngày nhận kế hoạch']);
-                                        const projectMonth = projectDate.getMonth() + 1;
-                                        return projectMonth === item.month &&
-                                            projectDate.getFullYear() === filters.year &&
-                                            (filters.months.includes('TẤT CẢ') ||
-                                                filters.months.includes(`Tháng ${projectMonth}`));
-                                    });
-                                    return monthProjects.reduce((sum, project) =>
-                                        sum + (project['Doanh thu tạm tính'] || 0), 0);
-                                }),
-                                backgroundColor: '#10B981',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#10B981',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: 'Doanh thu nội suy',
-                                data: monthlyData.map(item => {
-                                    const monthProjects = getSortedFilteredItems.filter(project => {
-                                        if (!project['Ngày nhận kế hoạch']) return false;
-                                        const projectDate = new Date(project['Ngày nhận kế hoạch']);
-                                        const projectMonth = projectDate.getMonth() + 1;
-                                        return projectMonth === item.month &&
-                                            projectDate.getFullYear() === filters.year &&
-                                            (filters.months.includes('TẤT CẢ') ||
-                                                filters.months.includes(`Tháng ${projectMonth}`));
-                                    });
-                                    return monthProjects.reduce((sum, project) =>
-                                        sum + (project['Doanh thu nội suy'] || 0), 0);
-                                }),
-                                backgroundColor: '#8B5CF6',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#8B5CF6',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'line',
-                                label: 'Chi tiêu',
-                                data: monthlyExpenses,
-                                borderColor: '#F59E0B',
-                                backgroundColor: '#F59E0B',
-                                borderWidth: 2,
-                                fill: false,
-                                tension: 0.4,
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#F59E0B',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            }
-                        ]
+        const monthlyData = prepareMonthlyData;
+        return {
+            type: 'bar',
+            data: {
+                labels: monthlyData.map(item => item.monthName),
+                datasets: [
+                    {
+                        type: 'bar',
+                        label: 'Tổng dự án',
+                        data: monthlyData.map(item => item.projectCount),
+                        backgroundColor: '#4F46E5',
+                        yAxisID: 'y',
+                        datalabels: {
+                            color: '#4F46E5',
+                            anchor: 'end',
+                            align: 'top'
+                        }
                     },
-                    options: {
-                        ...commonOptions,
-                        scales: {
-                            y: {
-                                type: 'linear',
-                                display: true,
-                                position: 'left',
-                                title: {
-                                    display: true,
-                                    text: 'Số lượng'
-                                }
-                            },
-                            y1: {
-                                type: 'linear',
-                                display: true,
-                                position: 'right',
-                                title: {
-                                    display: true,
-                                    text: 'Doanh thu/Chi tiêu (VNĐ)'
-                                },
-                                grid: {
-                                    drawOnChartArea: false
-                                }
-                            }
-                        },
-                        plugins: {
-                            ...commonOptions.plugins,
-                            title: {
-                                display: true,
-                                text: `Thống kê dự án theo tháng (Năm ${filters.year})`,
-                                font: {
-                                    size: 16
-                                }
-                            }
+                    {
+                        type: 'bar',
+                        label: 'Doanh thu HSHC',
+                        data: monthlyData.map(item => item.totalRevenue),
+                        backgroundColor: '#EC4899',
+                        yAxisID: 'y1',
+                        datalabels: {
+                            color: '#EC4899',
+                            anchor: 'end',
+                            align: 'top'
+                        }
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Doanh thu tạm tính',
+                        data: monthlyData.map(item => {
+                            const monthProjects = getSortedFilteredItems.filter(project => {
+                                if (!project['Ngày nhận kế hoạch']) return false;
+                                const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                                const projectMonth = projectDate.getMonth() + 1;
+                                return projectMonth === item.month &&
+                                    projectDate.getFullYear() === filters.year &&
+                                    (filters.months.includes('TẤT CẢ') ||
+                                        filters.months.includes(`Tháng ${projectMonth}`));
+                            });
+                            return monthProjects.reduce((sum, project) =>
+                                sum + (project['Doanh thu tạm tính'] || 0), 0);
+                        }),
+                        backgroundColor: '#10B981',
+                        yAxisID: 'y1',
+                        datalabels: {
+                            color: '#10B981',
+                            anchor: 'end',
+                            align: 'top'
+                        }
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Doanh thu nội suy theo dự án',
+                        data: monthlyData.map(item => {
+                            const monthProjects = getSortedFilteredItems.filter(project => {
+                                if (!project['Ngày nhận kế hoạch']) return false;
+                                const projectDate = new Date(project['Ngày nhận kế hoạch']);
+                                const projectMonth = projectDate.getMonth() + 1;
+                                return projectMonth === item.month &&
+                                    projectDate.getFullYear() === filters.year &&
+                                    (filters.months.includes('TẤT CẢ') ||
+                                        filters.months.includes(`Tháng ${projectMonth}`));
+                            });
+                            return monthProjects.reduce((sum, project) =>
+                                sum + (project['Doanh thu nội suy'] || 0), 0);
+                        }),
+                        backgroundColor: '#8B5CF6',
+                        yAxisID: 'y1',
+                        datalabels: {
+                            color: '#8B5CF6',
+                            anchor: 'end',
+                            align: 'top'
+                        }
+                    },
+                    {
+                        type: 'bar',
+                        label: 'Doanh thu theo thời gian',
+                        data: monthlyData.map(item => {
+                            const monthName = `Tháng ${item.month}`;
+                            return monthlyDTData[monthName]?.totalRevenue || 0;
+                        }),
+                        backgroundColor: '#F59E0B',
+                        yAxisID: 'y1',
+                        datalabels: {
+                            color: '#F59E0B',
+                            anchor: 'end',
+                            align: 'top'
+                        }
+                    },
+                    {
+                        type: 'line',
+                        label: 'Chi tiêu',
+                        data: monthlyExpenses,
+                        borderColor: '#F59E0B',
+                        backgroundColor: '#F59E0B',
+                        borderWidth: 2,
+                        fill: false,
+                        tension: 0.4,
+                        yAxisID: 'y1',
+                        datalabels: {
+                            color: '#F59E0B',
+                            anchor: 'end',
+                            align: 'top'
                         }
                     }
-                };
-            }
-
-            case 'cumulative': {
-                const cumulativeData = prepareCumulativeData;
-
-                // Calculate cumulative values for estimated and derived revenue
-                const cumulativeEstimatedRevenue = [];
-                const cumulativeDerivedRevenue = [];
-                const cumulativeExpenses = [];
-
-                let runningEstimated = 0;
-                let runningDerived = 0;
-                let runningExpenses = 0;
-
-                for (let month = 1; month <= 12; month++) {
-                    // Filter projects for this month and earlier in the selected year
-                    const monthProjects = getSortedFilteredItems.filter(project => {
-                        if (!project['Ngày nhận kế hoạch']) return false;
-                        const projectDate = new Date(project['Ngày nhận kế hoạch']);
-                        return projectDate.getMonth() + 1 <= month &&
-                            projectDate.getFullYear() === filters.year;
-                    });
-
-                    // Calculate cumulative revenues
-                    runningEstimated = monthProjects.reduce((sum, project) =>
-                        sum + (project['Doanh thu tạm tính'] || 0), 0);
-
-                    runningDerived = monthProjects.reduce((sum, project) =>
-                        sum + (project['Doanh thu nội suy'] || 0), 0);
-
-                    // Calculate cumulative expenses
-                    const monthExpenses = chiData.filter(chi => {
-                        if (!chi['Ngày giải ngân']) return false;
-                        const chiDate = new Date(chi['Ngày giải ngân']);
-                        return chiDate.getMonth() + 1 <= month &&
-                            chiDate.getFullYear() === filters.year;
-                    });
-
-                    runningExpenses = monthExpenses.reduce((sum, chi) =>
-                        sum + (chi['SỐ TIỀN'] || 0), 0);
-
-                    cumulativeEstimatedRevenue.push(runningEstimated);
-                    cumulativeDerivedRevenue.push(runningDerived);
-                    cumulativeExpenses.push(runningExpenses);
+                ]
+            },
+            options: {
+                ...commonOptions,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: {
+                            display: true,
+                            text: 'Số lượng'
+                        }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: {
+                            display: true,
+                            text: 'Doanh thu/Chi tiêu (VNĐ)'
+                        },
+                        grid: {
+                            drawOnChartArea: false
+                        }
+                    }
+                },
+                plugins: {
+                    ...commonOptions.plugins,
+                    title: {
+                        display: true,
+                        text: `Thống kê dự án theo tháng (Năm ${filters.year})`,
+                        font: {
+                            size: 16
+                        }
+                    }
                 }
-
-                return {
-                    type: 'bar',
-                    data: {
-                        labels: cumulativeData.map(item => item.monthName),
-                        datasets: [
-                            {
-                                type: 'bar',
-                                label: 'Dự án tích lũy',
-                                data: cumulativeData.map(item => item.projectCount),
-                                backgroundColor: '#4F46E5',
-                                yAxisID: 'y',
-                                datalabels: {
-                                    color: '#4F46E5',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: 'Doanh thu HSHC tích lũy',
-                                data: cumulativeData.map(item => item.totalRevenue),
-                                backgroundColor: '#EC4899',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#EC4899',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: 'Doanh thu tạm tính tích lũy',
-                                data: cumulativeEstimatedRevenue,
-                                backgroundColor: '#10B981',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#10B981',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: 'Doanh thu nội suy tích lũy',
-                                data: cumulativeDerivedRevenue,
-                                backgroundColor: '#8B5CF6',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#8B5CF6',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'line',
-                                label: 'Chi tiêu tích lũy',
-                                data: cumulativeExpenses,
-                                borderColor: '#F59E0B',
-                                backgroundColor: '#F59E0B',
-                                borderWidth: 2,
-                                fill: false,
-                                tension: 0.4,
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#F59E0B',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            }
-                        ]
-                    },
-                    options: {
-                        ...commonOptions,
-                        scales: {
-                            y: {
-                                type: 'linear',
-                                display: true,
-                                position: 'left',
-                                title: {
-                                    display: true,
-                                    text: 'Số lượng'
-                                }
-                            },
-                            y1: {
-                                type: 'linear',
-                                display: true,
-                                position: 'right',
-                                title: {
-                                    display: true,
-                                    text: 'Doanh thu/Chi tiêu (VNĐ)'
-                                },
-                                grid: {
-                                    drawOnChartArea: false
-                                }
-                            }
-                        },
-                        plugins: {
-                            ...commonOptions.plugins,
-                            title: {
-                                display: true,
-                                text: `Số liệu tích lũy theo thời gian (Năm ${filters.year})`,
-                                font: {
-                                    size: 16
-                                }
-                            }
-                        }
-                    }
-                };
             }
-
-            case 'average': {
-                const averageData = prepareMonthlyAverages;
-                const monthlyExpenses = calculateMonthlyExpenses;
-
-                // Calculate monthly data for estimated and derived revenue
-                const currentYearEstimatedRevenue = [];
-                const currentYearDerivedRevenue = [];
-
-                for (let month = 1; month <= 12; month++) {
-                    // Filter projects for this month in the selected year
-                    const monthProjects = getSortedFilteredItems.filter(project => {
-                        if (!project['Ngày nhận kế hoạch']) return false;
-                        const projectDate = new Date(project['Ngày nhận kế hoạch']);
-                        return projectDate.getMonth() + 1 === month &&
-                            projectDate.getFullYear() === filters.year;
-                    });
-
-                    // Calculate revenues
-                    const estimatedRevenue = monthProjects.reduce((sum, project) =>
-                        sum + (project['Doanh thu tạm tính'] || 0), 0);
-
-                    const derivedRevenue = monthProjects.reduce((sum, project) =>
-                        sum + (project['Doanh thu nội suy'] || 0), 0);
-
-                    currentYearEstimatedRevenue.push(estimatedRevenue);
-                    currentYearDerivedRevenue.push(derivedRevenue);
-                }
-
-                return {
-                    type: 'bar',
-                    data: {
-                        labels: averageData.map(item => item.monthName),
-                        datasets: [
-                            {
-                                type: 'bar',
-                                label: `Số dự án ${filters.year}`,
-                                data: averageData.map(item => item.currentYearCount),
-                                backgroundColor: '#4F46E5',
-                                yAxisID: 'y',
-                                datalabels: {
-                                    color: '#4F46E5',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: `Doanh thu HSHC ${filters.year}`,
-                                data: averageData.map(item => item.currentYearRevenue),
-                                backgroundColor: '#EC4899',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#EC4899',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: `Doanh thu tạm tính ${filters.year}`,
-                                data: currentYearEstimatedRevenue,
-                                backgroundColor: '#10B981',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#10B981',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'bar',
-                                label: `Doanh thu nội suy ${filters.year}`,
-                                data: currentYearDerivedRevenue,
-                                backgroundColor: '#8B5CF6',
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#8B5CF6',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            },
-                            {
-                                type: 'line',
-                                label: `Chi tiêu ${filters.year}`,
-                                data: monthlyExpenses,
-                                borderColor: '#F59E0B',
-                                backgroundColor: '#F59E0B',
-                                borderWidth: 2,
-                                fill: false,
-                                tension: 0.4,
-                                yAxisID: 'y1',
-                                datalabels: {
-                                    color: '#F59E0B',
-                                    anchor: 'end',
-                                    align: 'top'
-                                }
-                            }
-                        ]
-                    },
-                    options: {
-                        ...commonOptions,
-                        scales: {
-                            y: {
-                                type: 'linear',
-                                display: true,
-                                position: 'left',
-                                title: {
-                                    display: true,
-                                    text: 'Số dự án'
-                                }
-                            },
-                            y1: {
-                                type: 'linear',
-                                display: true,
-                                position: 'right',
-                                title: {
-                                    display: true,
-                                    text: 'Doanh thu/Chi tiêu (VNĐ)'
-                                },
-                                grid: {
-                                    drawOnChartArea: false
-                                }
-                            }
-                        },
-                        plugins: {
-                            ...commonOptions.plugins,
-                            title: {
-                                display: true,
-                                text: `So sánh với trung bình các năm (${filters.year})`,
-                                font: {
-                                    size: 16
-                                }
-                            }
-                        }
-                    }
-                };
-            }
-
-            default:
-                return null;
-        }
-    }, [chartType, months, calculateMonthlyExpenses, prepareMonthlyData, getSortedFilteredItems, filters.year, filters.months, chiData, formatCurrency, prepareCumulativeData, prepareMonthlyAverages]);
+        };
+    }, [months, calculateMonthlyExpenses, prepareMonthlyData, getSortedFilteredItems, filters.year, filters.months, formatCurrency, calculateMonthlyDTStatistics]);
 
     // Calculate summary statistics
     const statistics = useMemo(() => {
@@ -1541,10 +1311,11 @@ const DuAnStatistics = () => {
 
         fetchProjects(signal);
         fetchChiData(signal);
+        fetchDTData(signal); // Thêm gọi API DTDATA
         toast.info('Đang làm mới dữ liệu...');
 
         return () => controller.abort();
-    }, [fetchProjects, fetchChiData]);
+    }, [fetchProjects, fetchChiData, fetchDTData]);
 
     // Export to Excel
     const exportToExcel = useCallback(() => {
@@ -1915,6 +1686,21 @@ const DuAnStatistics = () => {
                                     ? ((statistics.totalRevenue - statistics.totalDerivedRevenue) / statistics.totalRevenue * 100).toFixed(1)
                                     : 0)}%)
                             </p>
+                            <p className="text-xs text-[#8b5cf6] mt-1">
+                                Doanh thu theo thời gian: {formatCurrency(dtData
+                                    .filter(dt => {
+                                        if (!dt['Ngày']) return false;
+                                        const dtDate = new Date(dt['Ngày']);
+                                        return dtDate.getFullYear() === filters.year &&
+                                            (filters.months.includes('TẤT CẢ') ||
+                                                filters.months.some(month => {
+                                                    if (month === 'TẤT CẢ') return true;
+                                                    const monthNum = parseInt(month.replace('Tháng ', ''));
+                                                    return dtDate.getMonth() + 1 === monthNum;
+                                                }));
+                                    })
+                                    .reduce((sum, dt) => sum + (dt['Doanh thu'] || 0), 0))}
+                            </p>
                         </div>
 
                         <div className="bg-amber-50 border border-amber-100 rounded-lg p-4">
@@ -1929,43 +1715,14 @@ const DuAnStatistics = () => {
                     {/* Charts Section */}
                     <div className="mb-8">
                         <div className="flex justify-between items-center mb-4">
-                            <h2 className="text-lg font-semibold text-gray-800">Thống kê dự án theo thời gian</h2>
-                            <div className="flex space-x-2 print:hidden">
-                                <button
-                                    onClick={() => setChartType('monthly')}
-                                    className={`px-3 py-1.5 text-xs font-medium rounded-md ${chartType === 'monthly'
-                                        ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
-                                        : 'bg-gray-100 text-gray-700 border-gray-200'
-                                        } border`}
-                                >
-                                    Theo tháng
-                                </button>
-                                <button
-                                    onClick={() => setChartType('cumulative')}
-                                    className={`px-3 py-1.5 text-xs font-medium rounded-md ${chartType === 'cumulative'
-                                        ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
-                                        : 'bg-gray-100 text-gray-700 border-gray-200'
-                                        } border`}
-                                >
-                                    Tích lũy
-                                </button>
-                                <button
-                                    onClick={() => setChartType('average')}
-                                    className={`px-3 py-1.5 text-xs font-medium rounded-md ${chartType === 'average'
-                                        ? 'bg-indigo-100 text-indigo-700 border-indigo-200'
-                                        : 'bg-gray-100 text-gray-700 border-gray-200'
-                                        } border`}
-                                >
-                                    So sánh TB
-                                </button>
-                            </div>
+                            <h2 className="text-lg font-semibold text-gray-800">Thống kê dự án theo tháng</h2>
                         </div>
                         <div className="bg-white border border-gray-200 rounded-lg p-4">
                             <div style={{ height: '500px', width: '100%' }}>
                                 {getChartConfig && (
                                     <Suspense fallback={<div className="flex items-center justify-center h-full">Đang tải biểu đồ...</div>}>
                                         <ProjectChart
-                                            chartType={chartType}
+                                            chartType="monthly"
                                             chartConfig={getChartConfig}
                                             chartRef={chartRef}
                                         />
