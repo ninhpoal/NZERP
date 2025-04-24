@@ -375,7 +375,7 @@ const DuAnStatistics = () => {
             setLoading(true);
             const response = await authUtils.apiRequest('CHI', 'Find', {
                 Properties: {
-                    Selector: `Filter(CHI, [TRẠNG THÁI] = "Đã giải ngân")`
+                    Selector: `Filter(CHI, and([Mã CHI]<>"TRANO"  , [TRẠNG THÁI] = "Đã giải ngân"))`
                 }
             }, { signal });
 
@@ -1009,22 +1009,50 @@ const DuAnStatistics = () => {
 
         for (let month = 1; month <= 12; month++) {
             const monthName = `Tháng ${month}`;
+            // Kiểm tra nếu tháng được chọn hoặc chọn "TẤT CẢ"
             if (filters.months.includes('TẤT CẢ') || filters.months.includes(monthName)) {
                 const monthDTData = dtData.filter(dt => {
                     if (!dt['Ngày']) return false;
                     const dtDate = new Date(dt['Ngày']);
-                    return dtDate.getMonth() + 1 === month && dtDate.getFullYear() === filters.year;
+                    
+                    // Lọc theo năm
+                    if (dtDate.getFullYear() !== filters.year) return false;
+                    
+                    // Lọc theo tháng
+                    if (dtDate.getMonth() + 1 !== month) return false;
+                    
+                    // Lọc theo khu vực nếu có
+                    if (!filters.area.includes('TẤT CẢ') && !filters.area.includes(dt['Khu vực'])) {
+                        return false;
+                    }
+                    
+                    // Lọc theo tìm kiếm nếu có
+                    if (search) {
+                        const searchLower = search.toLowerCase();
+                        if (!dt['Mã kế hoạch']?.toLowerCase().includes(searchLower) && 
+                            !dt['POP']?.toLowerCase().includes(searchLower)) {
+                            return false;
+                        }
+                    }
+                    
+                    return true;
                 });
 
                 monthlyStats[monthName] = {
                     dtCount: monthDTData.length,
                     totalRevenue: monthDTData.reduce((sum, dt) => sum + (dt['Doanh thu'] || 0), 0)
                 };
+            } else {
+                // Nếu tháng không được chọn, đặt giá trị là 0
+                monthlyStats[monthName] = {
+                    dtCount: 0,
+                    totalRevenue: 0
+                };
             }
         }
 
         return monthlyStats;
-    }, [dtData, filters.year, filters.months]);
+    }, [dtData, filters.year, filters.months, filters.area, search]);
 
     // Get chart configuration
     const getChartConfig = useMemo(() => {
@@ -1168,7 +1196,11 @@ const DuAnStatistics = () => {
                         label: 'Doanh thu theo thời gian',
                         data: monthlyData.map(item => {
                             const monthName = `Tháng ${item.month}`;
-                            return monthlyDTData[monthName]?.totalRevenue || 0;
+                            // Chỉ tính toán nếu tháng được chọn hoặc chọn "TẤT CẢ"
+                            if (filters.months.includes('TẤT CẢ') || filters.months.includes(monthName)) {
+                                return monthlyDTData[monthName]?.totalRevenue || 0;
+                            }
+                            return 0;
                         }),
                         backgroundColor: '#F59E0B',
                         yAxisID: 'y1',
