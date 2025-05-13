@@ -510,7 +510,7 @@ const LuongThucTe = () => {
     };
 
     return (
-        <div className="p-4 md:p-6 bg-gray-50 min-h-screen print:bg-white print:p-0">
+        <div className="p-4 md:p-6 bg-gray-50 h-[calc(100vh-7rem)] print:bg-white print:p-0">
             <div className="mx-auto">
                 <div className="bg-white rounded-xl shadow-sm p-5 mb-6 border border-gray-100 print:shadow-none print:border-none">
                     {/* Header Section */}

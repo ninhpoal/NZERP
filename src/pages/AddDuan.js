@@ -457,7 +457,7 @@ const KeHoachForm = () => {
     };
 
     return (
-        <div className="bg-white p-3">
+        <div className="bg-white h-[calc(100vh-7rem)]">
             <ToastContainer position="bottom-right" autoClose={3000} hideProgressBar={false} />
 
             {/* Modal component */}

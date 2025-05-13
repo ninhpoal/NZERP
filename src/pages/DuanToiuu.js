@@ -304,12 +304,23 @@ const DuAnStatistics = () => {
 
     // Constants
     const checkValues = ['TẤT CẢ', 'Đạt', 'Trung bình', 'Xấu', 'Chưa đánh giá'];
-    const trangThai = ['TẤT CẢ', '1/ Nhận Kế Hoạch', '2/ Đang thi công', '3/ Xự cố',
-        '4/ Chờ cắt chuyển', '5/ Chờ thay đổi phương án', '6/ Thiếu vật tư',
-        '7/ Đã thi công xong', '8/ Đã hoàn thành BCHN',
-        '9/ Duyệt sản phẩm', '10/ Nhập MBM - Hoàn công', '11/ Hoàn thành hoàn công',
-        '12/ Đã nghiệm thu', '13/ Đã xuất hóa đơn',
-        '14/ Đã thanh toán', '15/ Hoàn thành'
+    const trangThai = [
+        'TẤT CẢ',
+        '1/ Nhận Kế Hoạch',
+        '2/ Đang thi công',
+        '3/ Xự cố',
+        '4/ Chờ cắt chuyển',
+        '5/ Chờ thay đổi phương án',
+        '6/ Thiếu vật tư',
+        '7/ Đã thi công xong',
+        '8/ Đã hoàn thành BCHN',
+        '9/ Duyệt sản phẩm',
+        '10/ Nhập MBM - Hoàn công',
+        '11/ Hoàn thành hoàn công',
+        '12/ Đã nghiệm thu',
+        '13/ Đã xuất hóa đơn',
+        '14/ Đã thanh toán',
+        '15/ Hoàn thành'
     ];
 
     // Update filter function
@@ -745,7 +756,14 @@ const DuAnStatistics = () => {
     const calculateStatusStatistics = useMemo(() => {
         const statusStats = {};
 
-        statuses.filter(status => status !== 'TẤT CẢ').forEach(status => {
+        // Sắp xếp trạng thái theo thứ tự từ 1 đến 15
+        const sortedStatuses = trangThai.filter(status => status !== 'TẤT CẢ').sort((a, b) => {
+            const numA = parseInt(a.split('/')[0]);
+            const numB = parseInt(b.split('/')[0]);
+            return numA - numB;
+        });
+
+        sortedStatuses.forEach(status => {
             const statusProjects = getSortedFilteredItems.filter(project => project['Trạng thái'] === status);
 
             statusStats[status] = {
@@ -757,7 +775,7 @@ const DuAnStatistics = () => {
         });
 
         return statusStats;
-    }, [statuses, getSortedFilteredItems]);
+    }, [trangThai, getSortedFilteredItems]);
 
     // Calculate monthly statistics
     const calculateMonthlyStatistics = useMemo(() => {
@@ -1439,7 +1457,7 @@ const DuAnStatistics = () => {
     }), [chiData, filters.year, calculateTotalExpenses]);
 
     return (
-        <div className="p-4 md:p-6 bg-gray-50 min-h-screen print:bg-white print:p-0">
+        <div className="p-4 md:p-6 bg-gray-50 h-[calc(100vh-7rem)] print:bg-white print:p-0">
             <div className="mx-auto">
                 <div className="bg-white rounded-xl shadow-sm p-5 mb-6 border border-gray-100 print:shadow-none print:border-none">
                     {/* Header Section */}
@@ -1514,7 +1532,7 @@ const DuAnStatistics = () => {
                                     <div>
                                         <h3 className="text-sm font-medium text-gray-700 mb-2">Trạng thái:</h3>
                                         <div className="max-h-48 overflow-y-auto bg-white border border-gray-300 rounded-lg p-2">
-                                            {statuses.map((status, index) => (
+                                            {trangThai.map((status, index) => (
                                                 <label key={index} className="flex items-center space-x-2 p-1 hover:bg-gray-50 rounded">
                                                     <input
                                                         type="checkbox"

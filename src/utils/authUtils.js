@@ -158,13 +158,14 @@ class AuthUtils {
         localStorage.removeItem('returnUrl');
         return returnUrl || config.ROUTES.DASHBOARD;
     }
-    saveAuthData(userData) {
+    saveAuthData(userData, rememberMe = false) {
         const now = new Date();
-        const expiryTime = new Date(now.getTime() + config.AUTH.TOKEN_DURATION);
+        const expiryTime = new Date(now.getTime() + (rememberMe ? 30 * 24 * 60 * 60 * 1000 : 24 * 60 * 60 * 1000));
 
         localStorage.setItem(config.AUTH.TOKEN_KEY, 'Bearer ' + Math.random().toString(36).substring(7));
         localStorage.setItem(config.AUTH.USER_DATA_KEY, JSON.stringify(userData));
         localStorage.setItem(config.AUTH.TOKEN_EXPIRY_KEY, expiryTime.toISOString());
+        localStorage.setItem(config.AUTH.REMEMBER_ME_KEY, rememberMe.toString());
     }
 
     getUserData() {
@@ -203,7 +204,7 @@ class AuthUtils {
         localStorage.removeItem('returnUrl');
     }
 
-    async login(username, password) {
+    async login(username, password, rememberMe = false) {
         if (!username || !password) {
             throw new Error('Vui lòng nhập đầy đủ thông tin đăng nhập!');
         }
@@ -217,7 +218,7 @@ class AuthUtils {
         if (result && Array.isArray(result) && result.length === 1) {
             const user = result[0];
             if (user.password === password) {
-                this.saveAuthData(user);
+                this.saveAuthData(user, rememberMe);
                 return user;
             }
         }

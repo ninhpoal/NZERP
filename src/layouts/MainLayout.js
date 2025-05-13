@@ -518,13 +518,13 @@ const MainLayout = ({ children }) => {
                     )}
                 </header>
 
+             
                 {/* Main Content */}
-                <main className={`mt-14 ${pageActions.length > 0 ? 'pt-10' : 'pt-0'}`}>
-                    <div className="p-2">
+                <main className={`mt-16 ${pageActions.length > 0 ? 'pt-12' : 'pt-0'} h-[calc(100vh-4rem)] overflow-hidden`}>
+                    <div className="p-4 h-full overflow-auto">
                         {children}
                     </div>
                 </main>
-
                 {/* Footer for main content area */}
                 <footer className="mt-auto py-4 px-5 border-t bg-white text-center text-xs text-gray-500">
                     <p>© 2025 CÔNG TY TNHH THƯƠNG MẠI VÀ DỊCH VỤ NZ</p>

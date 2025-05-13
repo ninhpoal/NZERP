@@ -374,7 +374,7 @@ const ImageSlicer = () => {
     const currentFileDetails = currentFile ? getFileDetails(currentFile) : null;
 
     return (
-        <div className="mx-auto p-4 bg-gray-50 min-h-screen">
+        <div className="mx-auto p-4 bg-gray-50 h-[calc(100vh-7rem)]">
             <div className="bg-white rounded-xl shadow-xl p-6 border border-gray-100">
                 <h1 className="text-3xl font-bold text-center mb-6 text-indigo-700">Bộ xử lý ảnh với OCR</h1>
 

@@ -481,7 +481,7 @@ const AttendanceSystem = () => {
     };
 
     return (
-        <div className=" min-h-screen">
+        <div className=" h-[calc(100vh-7rem)]">
             <div className=" mx-auto p-4">
                 {/* Header */}
                 <div className="mb-6">

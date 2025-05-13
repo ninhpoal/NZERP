@@ -15,6 +15,7 @@ const LoginPage = () => {
         username: '',
         password: ''
     });
+    const [rememberMe, setRememberMe] = useState(false);
 
     useEffect(() => {
         // Clear any previous toast messages when component mounts
@@ -57,7 +58,7 @@ const LoginPage = () => {
 
         setLoading(true);
         try {
-            const user = await authUtils.login(formData.username, formData.password);
+            const user = await authUtils.login(formData.username, formData.password, rememberMe);
 
             // Show success message with consistent timing
             toast.success(`Chào mừng ${user.username} đã quay trở lại!`, {
@@ -183,7 +184,13 @@ const LoginPage = () => {
 
                             <div className="flex justify-between items-center text-sm">
                                 <div className="flex items-center">
-                                    <input type="checkbox" id="remember" checked className="h-4 w-4 text-[#d99c07] focus:ring-yellow-100 border-gray-300 rounded" />
+                                    <input 
+                                        type="checkbox" 
+                                        id="remember" 
+                                        checked={rememberMe}
+                                        onChange={(e) => setRememberMe(e.target.checked)}
+                                        className="h-4 w-4 text-[#d99c07] focus:ring-yellow-100 border-gray-300 rounded" 
+                                    />
                                     <label htmlFor="remember" className="ml-2 text-gray-600">Ghi nhớ đăng nhập</label>
                                 </div>
                             </div>

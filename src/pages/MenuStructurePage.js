@@ -22,7 +22,7 @@ const MenuStructurePage = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="h-[calc(100vh-7rem)] bg-gradient-to-br from-gray-50 to-gray-100">
             {/* Main Content */}
             <div className="mx-auto p-4">
                 {menuConfig
