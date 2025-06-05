@@ -304,24 +304,12 @@ const DuAnStatistics = () => {
 
     // Constants
     const checkValues = ['TẤT CẢ', 'Đạt', 'Trung bình', 'Xấu', 'Chưa đánh giá'];
-    const trangThai = [
-        'TẤT CẢ',
-        '1/ Nhận Kế Hoạch',
-        '2/ Đang thi công',
-        '3/ Xự cố',
-        '4/ Chờ cắt chuyển',
-        '5/ Chờ thay đổi phương án',
-        '6/ Thiếu vật tư',
-        '7/ Đã thi công xong',
-        '8/ Đã hoàn thành BCHN',
-        '9/ Duyệt sản phẩm',
-        '10/ Nhập MBM - Hoàn công',
-        '11/ Hoàn thành hoàn công',
-        '12/ Đã nghiệm thu',
-        '13/ Đã xuất hóa đơn',
-        '14/ Đã thanh toán',
-        '15/ Hoàn thành'
-    ];
+        const trangThai = ['TẤT CẢ',"1 / Nhận Kế Hoạch","2 / Đã nhận vật tư","3 / Đã giao vật tư thi công",
+        "4 / Đang Kéo cáp","5 / Đang Hàn nối","6 / Có vướng mắc","7 / Hủy","8 / Đã Kéo cáp xong",
+        "9 / Chờ cắt chuyển","10 / Đã Hàn nối xong","11 / Đã hoàn thành báo cáo Kéo cáp",
+        "12 / Đã hoàn thành báo cáo Hàn nối","13 / Đã Clear kho trước nghiệm thu","14 / Đã duyệt sản phẩm",
+        "15 / Nhập MBM + Làm HS nghiệm thu","16 / Hoàn thành HS nghiệm thu + Chờ nghiệm thu","17 / Đã nghiệm thu xong",
+        "18 / Đã Clear kho sau nghiệm thu","19 / Đã hoàn thành HSHC&QT","20 / Đã xuất hóa đơn","21 / Đã thanh toán, hoàn tất công trình"];
 
     // Update filter function
     const updateFilter = useCallback((key, value) => {
