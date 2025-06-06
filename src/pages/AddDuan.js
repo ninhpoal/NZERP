@@ -201,7 +201,22 @@ const KeHoachForm = () => {
         toast.success(`Đã thêm ${newOptionValue} vào danh sách`);
         setModalOpen(false);
     };
-
+const normalizeLoaiCap = (loaiCap) => {
+    if (!loaiCap) return '';
+    
+    const capStr = loaiCap.toString().trim().toUpperCase();
+    
+    // Regex để tìm pattern số + chữ (FO, DU, FM, v.v.)
+    const match = capStr.match(/^(\d+)([A-Z]+)$/);
+    
+    if (match) {
+        const [, number, suffix] = match;
+        const paddedNumber = number.padStart(2, '0'); // Thêm số 0 phía trước nếu < 10
+        return `${paddedNumber}${suffix}`;
+    }
+    
+    return capStr; // Trả về nguyên gốc nếu không match pattern
+};
     const readExcelFile = (e) => {
         const file = e.target.files[0];
 
@@ -247,7 +262,7 @@ const KeHoachForm = () => {
                             tuyenCap: sheetTM[`A${R}`]?.v || '',
                             diemDau: sheetTM[`C${R}`]?.v || '',
                             diemCuoi: sheetTM[`D${R}`]?.v || '',
-                            loaiCap: sheetTM[`E${R}`]?.v || '',
+                            loaiCap: normalizeLoaiCap(sheetTM[`E${R}`]?.v) || '',
                             duToan: duToan || ''
                         });
                     }
@@ -923,7 +938,8 @@ const KeHoachForm = () => {
                                             placeholder="Điểm cuối"
                                         />
                                     </td>
-                                    <td className="px-1 py-1" style={{ position: 'relative', zIndex: 40 - index }}>
+
+                                    <td className="px-1 py-1" style={{ position: 'relative' }}>
                                         <Select
                                             value={row.loaiCap ? { value: row.loaiCap, label: row.loaiCap } : null}
                                             onChange={(option) => handleBcsgChange(index, 'loaiCap', option ? option.value : '')}
@@ -973,6 +989,7 @@ const KeHoachForm = () => {
                                             classNamePrefix="react-select"
                                             menuPosition="fixed"
                                             menuPortalTarget={document.body}
+                                            menuPlacement="auto"
                                             styles={{
                                                 ...customSelectStyles,
                                                 control: (base) => ({
@@ -986,7 +1003,11 @@ const KeHoachForm = () => {
                                                 }),
                                                 menuPortal: (base) => ({
                                                     ...base,
-                                                    zIndex: 9999
+                                                    zIndex: 99999 // Tăng z-index cao hơn
+                                                }),
+                                                menu: (base) => ({
+                                                    ...base,
+                                                    zIndex: 99999
                                                 })
                                             }}
                                         />
