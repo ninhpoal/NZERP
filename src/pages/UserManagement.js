@@ -110,7 +110,7 @@ const DSNVManagement = () => {
     // Fetch data
     const fetchEmployees = async () => {
         try {
-            const response = await authUtils.apiRequest('DSNV', 'Find', {});
+            const response = await authUtils.apiRequestLogin('DSNV', 'Find', {});
             setEmployees(response);
         } catch (error) {
             console.error('Error fetching employee list:', error);
@@ -404,13 +404,13 @@ const DSNVManagement = () => {
 
             if (isEditMode) {
                 // Edit existing employee
-                await authUtils.apiRequest('DSNV', 'Edit', {
+                await authUtils.apiRequestLogin('DSNV', 'Edit', {
                     "Rows": [employeeToSave]
                 });
                 toast.success('Cập nhật thông tin nhân viên thành công!');
             } else {
                 // Create new employee
-                const existingEmployees = await authUtils.apiRequest('DSNV', 'Find', {});
+                const existingEmployees = await authUtils.apiRequestLogin('DSNV', 'Find', {});
 
                 // Check if username already exists
                 const exists = existingEmployees.some(emp =>
@@ -423,7 +423,7 @@ const DSNVManagement = () => {
                     return;
                 }
 
-                await authUtils.apiRequest('DSNV', 'Add', {
+                await authUtils.apiRequestLogin('DSNV', 'Add', {
                     "Rows": [employeeToSave]
                 });
                 toast.success('Thêm nhân viên mới thành công!');
@@ -458,7 +458,7 @@ const DSNVManagement = () => {
         if (!employeeToDelete) return;
 
         try {
-            await authUtils.apiRequest('DSNV', 'Delete', {
+            await authUtils.apiRequestLogin('DSNV', 'Delete', {
                 "Rows": [{ "username": employeeToDelete['username'] }]
             });
             toast.success('Xóa nhân viên thành công!');

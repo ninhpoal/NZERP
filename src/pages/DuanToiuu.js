@@ -304,7 +304,7 @@ const DuAnStatistics = () => {
 
     // Constants
     const checkValues = ['TẤT CẢ', 'Đạt', 'Trung bình', 'Xấu', 'Chưa đánh giá'];
-        const trangThai = ['TẤT CẢ',"1 / Nhận Kế Hoạch","2 / Đã nhận vật tư","3 / Đã giao vật tư thi công",
+    const trangThai = ['TẤT CẢ',"1 / Nhận Kế Hoạch","2 / Đã nhận vật tư","3 / Đã giao vật tư thi công",
         "4 / Đang Kéo cáp","5 / Đang Hàn nối","6 / Có vướng mắc","7 / Hủy","8 / Đã Kéo cáp xong",
         "9 / Chờ cắt chuyển","10 / Đã Hàn nối xong","11 / Đã hoàn thành báo cáo Kéo cáp",
         "12 / Đã hoàn thành báo cáo Hàn nối","13 / Đã Clear kho trước nghiệm thu","14 / Đã duyệt sản phẩm",

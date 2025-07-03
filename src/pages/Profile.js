@@ -55,7 +55,7 @@ const Profile = () => {
                     return;
                 }
 
-                const response = await authUtils.apiRequest('DSNV', 'Find', {
+                const response = await authUtils.apiRequestLogin('DSNV', 'Find', {
                     Properties: {
                         Selector: `Filter(DSNV, [username] = "${localUser.username}")`
                     }
@@ -163,7 +163,7 @@ const Profile = () => {
                 'Image': imageUrl
             };
 
-            await authUtils.apiRequest('DSNV', 'Edit', {
+            await authUtils.apiRequestLogin('DSNV', 'Edit', {
                 Rows: [updatedData]
             });
 
@@ -216,7 +216,7 @@ const Profile = () => {
                 password: passwordData.newPassword
             };
 
-            await authUtils.apiRequest('DSNV', 'Edit', {
+            await authUtils.apiRequestLogin('DSNV', 'Edit', {
                 Rows: [updatedUser]
             });
 

@@ -86,6 +86,29 @@ class AuthUtils {
             throw error;
         }
     }
+       async apiRequestLogin(tableName, action, data, select = {}) {
+        const apiUrl = `https://www.appsheet.com/api/v2/apps/1fece6ef-ca5a-4752-b1a6-845eb83ab65c/tables/${tableName}/Action`;
+        try {
+            const response = await fetch(apiUrl, {
+                method: 'POST',
+                headers: {
+                    'ApplicationAccessKey': 'V2-2fVcZ-SksKv-txdVq-1EbB9-qUWuo-bbcZL-HVUAY-a7KXS',
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    Action: action,
+
+                    select,
+                    ...data
+                })
+            });
+            if (!response.ok) throw new Error('Network response was not ok');
+            return await response.json();
+        } catch (error) {
+            console.error('API request failed:', error);
+            throw error;
+        }
+    }
     async apiRequestErp(tableName, action, Properties = {}, data) {
         const apiUrl = `https://www.appsheet.com/api/v2/apps/509dd5b5-bc8b-4962-8122-bbc6d3cf3f55/tables/${tableName}/Action`;
         try {
@@ -209,7 +232,7 @@ class AuthUtils {
             throw new Error('Vui lòng nhập đầy đủ thông tin đăng nhập!');
         }
 
-        const result = await this.apiRequest('DSNV', 'Find', {
+        const result = await this.apiRequestLogin('DSNV', 'Find', {
             Properties: {
                 Selector: `Filter(DSNV, and( [username] = "${username}" , [password] = "${password}"))`
             }
