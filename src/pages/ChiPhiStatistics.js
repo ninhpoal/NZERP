@@ -561,14 +561,21 @@ const ChiPhiStatistics = () => {
     // Export to Excel
     const exportToExcel = () => {
         try {
-            // Prepare data for export
-            const exportData = filteredItems.map(chi => ({
+            // Sort data by date before export
+            const sortedData = [...filteredItems].sort((a, b) => {
+                const dateA = a['Ngày giải ngân'] ? new Date(a['Ngày giải ngân']) : new Date(0);
+                const dateB = b['Ngày giải ngân'] ? new Date(b['Ngày giải ngân']) : new Date(0);
+                return dateB.getTime() - dateA.getTime(); // Sắp xếp giảm dần (mới nhất trước)
+            });
+
+            // Prepare data for export with better date formatting
+            const exportData = sortedData.map(chi => ({
                 'Mã chuyển khoản': chi['Mã chuyển khoản'] || '',
                 'IDPHIEU': chi['IDPHIEU'] || '',
                 'KHU VỰC': chi['KHU VỰC'] || '',
                 'Dự án': chi['Dự án'] || '',
                 'Mã CHI': chi['Mã CHI'] || '',
-                'Ngày giải ngân': formatDate(chi['Ngày giải ngân']),
+                'Ngày giải ngân': chi['Ngày giải ngân'] ? new Date(chi['Ngày giải ngân']) : null,
                 'SỐ TIỀN': chi['SỐ TIỀN'] || 0,
                 'NỘI DUNG': chi['NỘI DUNG'] || '',
                 'NHÂN VIÊN THỰC HIỆN': chi['NHÂN VIÊN THỰC HIỆN'] || '',
@@ -580,6 +587,44 @@ const ChiPhiStatistics = () => {
 
             // Create worksheet
             const ws = XLSX.utils.json_to_sheet(exportData);
+
+            // Set column widths
+            const columnWidths = [
+                { wch: 15 }, // Mã chuyển khoản
+                { wch: 12 }, // IDPHIEU
+                { wch: 12 }, // KHU VỰC
+                { wch: 20 }, // Dự án
+                { wch: 12 }, // Mã CHI
+                { wch: 12 }, // Ngày giải ngân
+                { wch: 15 }, // SỐ TIỀN
+                { wch: 40 }, // NỘI DUNG
+                { wch: 20 }, // NHÂN VIÊN THỰC HIỆN
+                { wch: 20 }, // ĐỐI TƯỢNG
+                { wch: 12 }, // TRẠNG THÁI
+                { wch: 15 }, // TKCHI
+                { wch: 15 }  // HOADON
+            ];
+            ws['!cols'] = columnWidths;
+
+            // Format date column
+            const dateColumn = 'F'; // Column F is 'Ngày giải ngân'
+            for (let i = 2; i <= exportData.length + 1; i++) {
+                const cellAddress = `${dateColumn}${i}`;
+                if (ws[cellAddress] && ws[cellAddress].v) {
+                    // Set number format for date
+                    ws[cellAddress].z = 'dd/mm/yyyy';
+                }
+            }
+
+            // Format currency column
+            const currencyColumn = 'G'; // Column G is 'SỐ TIỀN'
+            for (let i = 2; i <= exportData.length + 1; i++) {
+                const cellAddress = `${currencyColumn}${i}`;
+                if (ws[cellAddress] && ws[cellAddress].v) {
+                    // Set number format for currency
+                    ws[cellAddress].z = '#,##0';
+                }
+            }
 
             // Create workbook
             const wb = XLSX.utils.book_new();
